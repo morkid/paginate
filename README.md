@@ -1,5 +1,7 @@
 # Gorm Pagination
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/morkid/paginate.svg)](https://pkg.go.dev/github.com/morkid/paginate)  
+
 Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagination is compatible for [net/http](https://golang.org/pkg/net/http/) or [fasthttp](https://github.com/valyala/fasthttp). Also support for many frameworks are based on net/http or fasthttp.
 
 ## Installation
