@@ -4,7 +4,8 @@
 [![CircleCI](https://circleci.com/gh/morkid/paginate.svg?style=svg)](https://circleci.com/gh/morkid/paginate)
 [![Github Actions](https://github.com/morkid/paginate/workflows/Go/badge.svg)](https://github.com/morkid/paginate/actions)
 [![Build Status](https://travis-ci.com/morkid/paginate.svg?branch=master)](https://travis-ci.com/morkid/paginate)
-[![CircleCI](https://circleci.com/gh/morkid/paginate.svg?style=shield)](https://circleci.com/gh/morkid/paginate)
+[![Go Report Card](https://goreportcard.com/badge/github.com/morkid/paginate)](https://goreportcard.com/report/github.com/morkid/paginate)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/morkid/paginate)
 
 Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagination is compatible for [net/http](https://golang.org/pkg/net/http/) or [fasthttp](https://github.com/valyala/fasthttp). Also support for many frameworks are based on net/http or fasthttp.
 
@@ -21,6 +22,7 @@ See example below:
 - [Fasthttp](#fasthttp-example)
 - [Fiber](#fiber-example)
 - [Echo](#echo-example)
+- [Gin](#gin-example)
 
 ## Paginate using http request
 example paging, sorting and filtering:  
@@ -200,3 +202,58 @@ func main() {
     app.Logger.Fatal(app.Start(":3000"))
 }
 ```
+
+### Gin Example
+
+```go
+package main
+
+import (
+    "github.com/morkid/paginate"
+    ...
+)
+
+func main() {
+    // var db *gorm.DB
+    pg := paginate.New()
+    app := gin.Default()
+    app.GET("/", func(c *gin.Context) {
+        model := db.Joins("User").Model(&Article{})
+        c.JSON(200, pg.Response(model, c.Request, &[]Article{}))
+    })
+    app.Run(":3000")
+}
+
+```
+
+# Override results
+
+You can override result with custom function.  
+
+```go
+// var db = *gorm.DB
+// var httpRequest ... net/http or fasthttp instance
+// Example override function
+override := func(article *Article) {
+    if article.UserID > 0 {
+        article.Title = fmt.Sprintf(
+            "%s written by %s", article.Title, article.User.Name)
+    }
+}
+
+var articles []Article
+model := db.Joins("User").Model(&Article{})
+
+pg := paginate.New()
+result := pg.Response(model, httpRequest, &articles)
+for index := range articles {
+    override(&articles[index])
+}
+
+log.Println(result.Items)
+
+```
+
+# License
+
+Published under the [MIT License](https://github.com/morkid/paginate/blob/master/LICENSE).
