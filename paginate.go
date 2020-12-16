@@ -288,6 +288,7 @@ func arrayToFilter(arr []interface{}, config Config) PageFilters {
 		Single: false,
 	}
 
+	operatorEscape := regexp.MustCompile(`[^A-z=\<\>\-\+\^/\*%& ]+`)
 	arrayLen := len(arr)
 
 	if len(arr) > 0 {
@@ -299,6 +300,7 @@ func arrayToFilter(arr []interface{}, config Config) PageFilters {
 			} else if arrayLen == 1 {
 				operator, ok := i.(string)
 				if ok {
+					operator = operatorEscape.ReplaceAllString(operator, "")
 					filters.Operator = strings.ToUpper(operator)
 					filters.IsOperator = true
 					filters.Single = true
@@ -324,6 +326,7 @@ func arrayToFilter(arr []interface{}, config Config) PageFilters {
 				} else if k == 1 {
 					operator, ok := i.(string)
 					if ok {
+						operator = operatorEscape.ReplaceAllString(operator, "")
 						filters.Operator = strings.ToUpper(operator)
 						filters.Single = true
 					}
