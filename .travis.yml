@@ -1,0 +1,5 @@
+language: go
+os: linux
+dist: xenial
+go: 1.x
+script: go test -v

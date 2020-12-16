@@ -1,6 +1,10 @@
 # Gorm Pagination
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/morkid/paginate.svg)](https://pkg.go.dev/github.com/morkid/paginate)  
+[![Go Reference](https://pkg.go.dev/badge/github.com/morkid/paginate.svg)](https://pkg.go.dev/github.com/morkid/paginate)
+[![CircleCI](https://circleci.com/gh/morkid/paginate.svg?style=svg)](https://circleci.com/gh/morkid/paginate)
+[![Github Actions](https://github.com/morkid/paginate/workflows/Go/badge.svg)](https://github.com/morkid/paginate/actions)
+[![Build Status](https://travis-ci.com/morkid/paginate.svg?branch=master)](https://travis-ci.com/morkid/paginate)
+[![CircleCI](https://circleci.com/gh/morkid/paginate.svg?style=shield)](https://circleci.com/gh/morkid/paginate)
 
 Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagination is compatible for [net/http](https://golang.org/pkg/net/http/) or [fasthttp](https://github.com/valyala/fasthttp). Also support for many frameworks are based on net/http or fasthttp.
 
@@ -101,7 +105,7 @@ example paging, sorting and filtering:
 
 ## Example Usage
 
-### Net/HTTP Example
+### NetHTTP Example
 
 ```go
 package main
