@@ -279,8 +279,8 @@ func TestPaginate(t *testing.T) {
 	}
 
 	// dsn := "host=127.0.0.1 port=5433 user=postgres password=postgres dbname=postgres sslmode=disable TimeZone=Asia/Jakarta"
-	dsn := "gorm.db"
-	// dsn := "file::memory:?cache=shared"
+	// dsn := "gorm.db"
+	dsn := "file::memory:?cache=shared"
 
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
