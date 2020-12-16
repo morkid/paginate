@@ -64,7 +64,7 @@ example paging, sorting and filtering:
 5. `http://localhost:3000/?filters=["age","between",[20, 25]]`  
     produces:
      ```sql
-    SELECT * FROM user WHERE age BETWEEN (20 AND 25) LIMIT 10 OFFSET 0
+    SELECT * FROM user WHERE ( age BETWEEN 20 AND 25 ) LIMIT 10 OFFSET 0
     ```
 6. `http://localhost:3000/?filters=[["name","like","john%25"],["OR"],["age","between",[20, 25]]]`  
     produces:

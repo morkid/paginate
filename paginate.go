@@ -441,7 +441,7 @@ func generateWhereCauses(f PageFilters, config Config) ([]string, []interface{})
 			case "BETWEEN":
 				values, ok := f.Value.([]interface{})
 				if ok && len(values) >= 2 {
-					wheres = append(wheres, fname, f.Operator, "( ? AND ? )")
+					wheres = append(wheres, "(", fname, f.Operator, "? AND ?", ")")
 					params = append(params, values[0], values[1])
 				}
 			case "IN", "NOT IN":
