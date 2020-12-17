@@ -19,6 +19,8 @@ Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagi
   - [Fiber](#fiber-example)
   - [Echo](#echo-example)
   - [Gin](#gin-example)
+  - [jQuery DataTable Integration](#jquery-datatable-integration)
+  - [jQuery Select2 Integration](#jquery-select2-integration)
 - [Filter format](#filter-format)
 - [Customize default configuration](#customize-default-configuration)
 - [Override results](#override-results)
@@ -257,6 +259,109 @@ func main() {
 }
 
 ```
+
+### jQuery DataTable Integration
+
+```js
+var logicalOperator = "OR"
+
+$('#myTable').DataTable({
+
+    columns: [
+        {
+            title: "Author",
+            data: "user.name"
+        }, {
+            title: "Title",
+            data: "title"
+        }
+    ],
+
+    processing: true,
+    
+    serverSide: true,
+
+    ajax: {
+        cache: true,
+        url: "http://localhost:3000/articles",
+        dataSrc: function(json) {
+            json.recordsTotal = json.visible
+            json.recordsFiltered = json.total
+            return json.items
+        },
+        data: function(params) {
+            var custom = {
+                page: !params.start ? 0 : Math.round(params.start / params.length),
+                size: params.length
+            }
+
+            if (params.order.length > 0) {
+                var sorts = []
+                for (var o in params.order) {
+                    var order = params.order[o]
+                    if (params.columns[order.column].orderable != false) {
+                        var sort = order.dir != 'desc' ? '' : '-'
+                        sort += params.columns[order.column].data
+                        sorts.push(sort)
+                    }
+                }
+                custom.sort = sorts.join()
+            }
+
+            if (params.search.value) {
+                var columns = []
+                for (var c in params.columns) {
+                    var col = params.columns[c]
+                    if (col.searchable == false) {
+                        continue
+                    }
+                    columns.push(JSON.stringify([col.data, "like", encodeURIComponent(params.search.value.toLowerCase())]))
+                }
+                custom.filters = '[' + columns.join(',["' + logicalOperator + '"],') + ']'
+            }
+
+            return custom
+        }
+    },
+})
+```
+
+### jQuery Select2 Integration
+
+```js
+$('#mySelect').select2({
+    ajax: {
+        url: "http://localhost:3000/users",
+        processResults: function(json) {
+            json.items.forEach(item => {
+                item.text = item.name
+            })
+            // optional
+            if (json.first) json.items.unshift({id: 0, text: 'All'})
+
+            return {
+                results: json.items,
+                pagination: {
+                    more: json.last == false
+                }
+            }
+        },
+        data: function(params) {
+            var filters = [
+                ["name", "like", params.term]
+            ]
+            var custom = {
+                filters: params.term ? JSON.stringify(filters) : "",
+                sort: "name",
+                page: params.page && params.page - 1 ? params.page - 1 : 0
+            }
+
+            return custom
+        },
+    }
+})
+```
+
 
 ## Filter format
 
