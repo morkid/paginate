@@ -34,7 +34,7 @@ func TestGetNetHttp(t *testing.T) {
 		},
 	}
 
-	parsed := ParseRequest(req, Config{})
+	parsed := parseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -58,7 +58,7 @@ func TestGetNetHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]PageFilters)
+	filters, ok := parsed.Filters.Value.([]pageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -73,7 +73,7 @@ func TestGetNetHttp(t *testing.T) {
 		}
 	} else {
 		log.Println(parsed.Filters)
-		t.Errorf(format, "PageFilters class", "paginate.PageFilters", "null")
+		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
 }
 func TestGetFastHttp(t *testing.T) {
@@ -89,7 +89,7 @@ func TestGetFastHttp(t *testing.T) {
 	req.Header.SetMethod("GET")
 	req.URI().SetQueryString(query)
 
-	parsed := ParseRequest(req, Config{})
+	parsed := parseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -113,7 +113,7 @@ func TestGetFastHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]PageFilters)
+	filters, ok := parsed.Filters.Value.([]pageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -128,7 +128,7 @@ func TestGetFastHttp(t *testing.T) {
 		}
 	} else {
 		log.Println(parsed.Filters)
-		t.Errorf(format, "PageFilters class", "paginate.PageFilters", "null")
+		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
 }
 
@@ -157,7 +157,7 @@ func TestPostNetHttp(t *testing.T) {
 		Body:   body,
 	}
 
-	parsed := ParseRequest(req, Config{})
+	parsed := parseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -181,7 +181,7 @@ func TestPostNetHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]PageFilters)
+	filters, ok := parsed.Filters.Value.([]pageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -196,7 +196,7 @@ func TestPostNetHttp(t *testing.T) {
 		}
 	} else {
 		log.Println(parsed.Filters)
-		t.Errorf(format, "PageFilters class", "paginate.PageFilters", "null")
+		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
 }
 func TestPostFastHttp(t *testing.T) {
@@ -221,7 +221,7 @@ func TestPostFastHttp(t *testing.T) {
 	req.Header.SetMethod("POST")
 	req.SetBodyString(query)
 
-	parsed := ParseRequest(req, Config{})
+	parsed := parseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -245,7 +245,7 @@ func TestPostFastHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]PageFilters)
+	filters, ok := parsed.Filters.Value.([]pageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -259,7 +259,7 @@ func TestPostFastHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
 	} else {
-		t.Errorf(format, "PageFilters class", "paginate.PageFilters", "null")
+		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
 }
 

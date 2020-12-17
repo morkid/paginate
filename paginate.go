@@ -20,7 +20,6 @@ import (
 // Pagination struct
 type Pagination struct {
 	Config *Config
-	DB     *gorm.DB
 }
 
 // Response func
@@ -29,8 +28,8 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 		p.Config = &Config{}
 	}
 	p.Config.Statement = query.Statement
-	if p.Config.DefaultPage == 0 {
-		p.Config.DefaultPage = 10
+	if p.Config.DefaultSize == 0 {
+		p.Config.DefaultSize = 10
 	}
 
 	if p.Config.FieldWrapper == "" && p.Config.ValueWrapper == "" {
@@ -46,12 +45,9 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 	}
 
 	page := Page{}
-	pr := ParseRequest(req, *p.Config)
-	causes := Causes(pr)
-	dbs := p.DB
-	if nil == dbs {
-		dbs = query.Statement.DB.Session(&gorm.Session{NewDB: true})
-	}
+	pr := parseRequest(req, *p.Config)
+	causes := createCauses(pr)
+	dbs := query.Statement.DB.Session(&gorm.Session{NewDB: true})
 
 	result := dbs.
 		Unscoped().
@@ -100,7 +96,6 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 // New func
 func New(params ...interface{}) *Pagination {
 	if len(params) >= 1 {
-		var DB *gorm.DB
 		var config *Config
 		for _, param := range params {
 			c, isConfig := param.(*Config)
@@ -108,26 +103,22 @@ func New(params ...interface{}) *Pagination {
 				config = c
 				continue
 			}
-			d, isDB := param.(*gorm.DB)
-			if isDB {
-				DB = d
-			}
 		}
 
-		if nil == DB && nil == config {
-			e := errors.New("Invalid argument, first argument of paginate.New() must be instance of *paginate.Config OR *gorm.DB")
+		if nil == config {
+			e := errors.New("Invalid argument, first argument of paginate.New() must be instance of *paginate.Config")
 			log.Println(e)
 		}
 
-		return &Pagination{Config: config, DB: DB}
+		return &Pagination{Config: config}
 	}
 
 	return &Pagination{Config: &Config{}}
 }
 
-// ParseRequest func
-func ParseRequest(r interface{}, config Config) PageRequest {
-	pr := PageRequest{
+// parseRequest func
+func parseRequest(r interface{}, config Config) pageRequest {
+	pr := pageRequest{
 		Config: config,
 	}
 	netHTTP, isNetHTTP := r.(http.Request)
@@ -153,8 +144,8 @@ func ParseRequest(r interface{}, config Config) PageRequest {
 	return pr
 }
 
-// Filters func
-func Filters(filterParams interface{}, p *PageRequest) {
+// createFilters func
+func createFilters(filterParams interface{}, p *pageRequest) {
 	f, ok := filterParams.([]interface{})
 	s, ok2 := filterParams.(string)
 	if ok {
@@ -168,11 +159,11 @@ func Filters(filterParams interface{}, p *PageRequest) {
 	}
 }
 
-// Causes func
-func Causes(p PageRequest) Query {
-	query := Query{}
+// createCauses func
+func createCauses(p pageRequest) requestQuery {
+	query := requestQuery{}
 	wheres, params := generateWhereCauses(p.Filters, p.Config)
-	sorts := []SortOrder{}
+	sorts := []sortOrder{}
 
 	for _, so := range p.Sorts {
 		so.Column = fieldName(so.Column)
@@ -193,59 +184,75 @@ func Causes(p PageRequest) Query {
 }
 
 // parsingNetHTTPRequest func
-func parsingNetHTTPRequest(r *http.Request, p *PageRequest) {
-	param := &Parameter{}
+func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
+	param := &parameter{}
 	if r.Method == "" {
 		r.Method = "GET"
 	}
 	if strings.ToUpper(r.Method) == "POST" {
 		decoder := json.NewDecoder(r.Body)
-		var postData Parameter
+		var postData map[string]string
+		// var postData parameter
 		if err := decoder.Decode(&postData); nil == err {
-			param = &postData
+			generateParams(param, p.Config, func(key string) string {
+				value, _ := postData[key]
+				return value
+			})
+			// param = &postData
 		} else {
 			log.Println(err.Error())
 		}
 	} else if strings.ToUpper(r.Method) == "GET" {
 		query := r.URL.Query()
-		param.Size = query.Get("size")
-		param.Page = query.Get("page")
-		param.Sort = query.Get("sort")
-		param.Order = query.Get("order")
-		param.Filters = query.Get("filters")
+		// param.Size = query.Get("size")
+		// param.Page = query.Get("page")
+		// param.Sort = query.Get("sort")
+		// param.Order = query.Get("order")
+		// param.Filters = query.Get("filters")
+		generateParams(param, p.Config, func(key string) string {
+			return query.Get(key)
+		})
 	}
 
 	parsingQueryString(param, p)
 }
 
 // parsingFastHTTPRequest func
-func parsingFastHTTPRequest(r *fasthttp.Request, p *PageRequest) {
-	param := &Parameter{}
+func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
+	param := &parameter{}
 	if r.Header.IsPost() {
 		b := r.Body()
-		var postData Parameter
+		var postData map[string]string
+		// var postData parameter
 		if err := json.Unmarshal(b, &postData); nil == err {
-			param = &postData
+			generateParams(param, p.Config, func(key string) string {
+				value, _ := postData[key]
+				return value
+			})
+			// param = &postData
 		} else {
 			log.Println(err.Error())
 		}
 	} else if r.Header.IsGet() {
 		query := r.URI().QueryArgs()
-		param.Size = string(query.Peek("size"))
-		param.Page = string(query.Peek("page"))
-		param.Sort = string(query.Peek("sort"))
-		param.Order = string(query.Peek("order"))
-		param.Filters = string(query.Peek("filters"))
+		// param.Size = string(query.Peek("size"))
+		// param.Page = string(query.Peek("page"))
+		// param.Sort = string(query.Peek("sort"))
+		// param.Order = string(query.Peek("order"))
+		// param.Filters = string(query.Peek("filters"))
+		generateParams(param, p.Config, func(key string) string {
+			return string(query.Peek(key))
+		})
 	}
 
 	parsingQueryString(param, p)
 }
 
-func parsingQueryString(param *Parameter, p *PageRequest) {
+func parsingQueryString(param *parameter, p *pageRequest) {
 	if i, e := strconv.Atoi(param.Size); nil == e {
 		p.Size = i
-	} else if p.Config.DefaultPage > 0 {
-		p.Size = int(p.Config.DefaultPage)
+	} else if p.Config.DefaultSize > 0 {
+		p.Size = int(p.Config.DefaultSize)
 	} else {
 		p.Size = 10
 	}
@@ -263,7 +270,7 @@ func parsingQueryString(param *Parameter, p *PageRequest) {
 				continue
 			}
 
-			so := SortOrder{
+			so := sortOrder{
 				Column:    col,
 				Direction: "ASC",
 			}
@@ -280,11 +287,35 @@ func parsingQueryString(param *Parameter, p *PageRequest) {
 		}
 	}
 
-	Filters(param.Filters, p)
+	createFilters(param.Filters, p)
 }
 
-func arrayToFilter(arr []interface{}, config Config) PageFilters {
-	filters := PageFilters{
+func generateParams(param *parameter, config Config, getValue func(string) string) {
+	findValue := func(keys []string, defaultKey string) string {
+		found := false
+		value := ""
+		for _, key := range keys {
+			value = getValue(key)
+			if value != "" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return getValue(defaultKey)
+		}
+		return value
+	}
+
+	param.Sort = findValue(config.SortParams, "sort")
+	param.Page = findValue(config.SortParams, "page")
+	param.Size = findValue(config.SortParams, "size")
+	param.Order = findValue(config.SortParams, "order")
+	param.Filters = findValue(config.SortParams, "filters")
+}
+
+func arrayToFilter(arr []interface{}, config Config) pageFilters {
+	filters := pageFilters{
 		Single: false,
 	}
 
@@ -292,7 +323,7 @@ func arrayToFilter(arr []interface{}, config Config) PageFilters {
 	arrayLen := len(arr)
 
 	if len(arr) > 0 {
-		subFilters := []PageFilters{}
+		subFilters := []pageFilters{}
 		for k, i := range arr {
 			iface, ok := i.([]interface{})
 			if ok && !filters.Single {
@@ -357,7 +388,7 @@ func arrayToFilter(arr []interface{}, config Config) PageFilters {
 			}
 		}
 		if len(subFilters) > 0 {
-			separatedSubFilters := []PageFilters{}
+			separatedSubFilters := []pageFilters{}
 			hasOperator := false
 			defaultOperator := config.Operator
 			if "" == defaultOperator {
@@ -368,7 +399,7 @@ func arrayToFilter(arr []interface{}, config Config) PageFilters {
 					break
 				}
 				if !hasOperator && !s.IsOperator && k > 0 {
-					separatedSubFilters = append(separatedSubFilters, PageFilters{
+					separatedSubFilters = append(separatedSubFilters, pageFilters{
 						Operator:   defaultOperator,
 						IsOperator: true,
 						Single:     true,
@@ -385,18 +416,18 @@ func arrayToFilter(arr []interface{}, config Config) PageFilters {
 	return filters
 }
 
-func generateWhereCauses(f PageFilters, config Config) ([]string, []interface{}) {
+func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{}) {
 	wheres := []string{}
 	params := []interface{}{}
 
 	if !f.Single && !f.IsOperator {
-		ifaces, ok := f.Value.([]PageFilters)
+		ifaces, ok := f.Value.([]pageFilters)
 		if ok && len(ifaces) > 0 {
 			wheres = append(wheres, "(")
 			hasOpen := false
 			for _, i := range ifaces {
-				subs, isSub := i.Value.([]PageFilters)
-				regular, isNotSub := i.Value.(PageFilters)
+				subs, isSub := i.Value.([]pageFilters)
+				regular, isNotSub := i.Value.(pageFilters)
 				if isSub && len(subs) > 0 {
 					wheres = append(wheres, "(")
 					for _, s := range subs {
@@ -508,13 +539,18 @@ type Config struct {
 	Operator     string
 	FieldWrapper string
 	ValueWrapper string
-	DefaultPage  int64
+	DefaultSize  int64
 	SmartSearch  bool
 	Statement    *gorm.Statement `json:"-"`
+	SortParams   []string
+	PageParams   []string
+	OrderParams  []string
+	SizeParams   []string
+	FilterParams []string
 }
 
-// PageFilters struct
-type PageFilters struct {
+// pageFilters struct
+type pageFilters struct {
 	Column      string
 	Operator    string
 	Value       interface{}
@@ -537,8 +573,8 @@ type Page struct {
 	Visible    int64       `json:"visible"`
 }
 
-// Parameter struct
-type Parameter struct {
+// parameter struct
+type parameter struct {
 	Page    string      `json:"page"`
 	Size    string      `json:"size"`
 	Sort    string      `json:"sort"`
@@ -546,27 +582,27 @@ type Parameter struct {
 	Filters interface{} `json:"filters"`
 }
 
-// Query struct
-type Query struct {
+// query struct
+type requestQuery struct {
 	WhereString string
 	Wheres      []string
 	Params      []interface{}
-	Sorts       []SortOrder
+	Sorts       []sortOrder
 	Limit       int
 	Offset      int
 }
 
-// PageRequest struct
-type PageRequest struct {
+// pageRequest struct
+type pageRequest struct {
 	Size    int
 	Page    int
-	Sorts   []SortOrder
-	Filters PageFilters
+	Sorts   []sortOrder
+	Filters pageFilters
 	Config  Config `json:"-"`
 }
 
 // SortOrder struct
-type SortOrder struct {
+type sortOrder struct {
 	Column    string
 	Direction string
 }
