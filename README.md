@@ -7,7 +7,23 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/morkid/paginate)](https://goreportcard.com/report/github.com/morkid/paginate)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/morkid/paginate)](https://github.com/morkid/paginate/releases)
 
-Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagination is compatible for [net/http](https://golang.org/pkg/net/http/) or [fasthttp](https://github.com/valyala/fasthttp). Also support for many frameworks are based on net/http or fasthttp.
+Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagination is compatible for [net/http](https://golang.org/pkg/net/http/) or [fasthttp](https://github.com/valyala/fasthttp). This library also supports many frameworks are based on net/http or fasthttp.
+
+## Table Of Contents
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Paginate using http request](#paginate-using-http-request)
+- [Example usage](#example-usage)
+  - [net/http](#nethttp-example)
+  - [Fasthttp](#fasthttp-example)
+  - [Fiber](#fiber-example)
+  - [Echo](#echo-example)
+  - [Gin](#gin-example)
+- [Filter format](#filter-format)
+- [Customize default configuration](#customize-default-configuration)
+- [Override results](#override-results)
+- [Limitation](#limitation)
+- [License](#license)
 
 ## Installation
 
@@ -15,14 +31,30 @@ Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagi
 go get -u github.com/morkid/paginate
 ```
 
-## Simple usage
+## Configuration
 
-See example below:  
-- [net/http](#nethttp-example)
-- [Fasthttp](#fasthttp-example)
-- [Fiber](#fiber-example)
-- [Echo](#echo-example)
-- [Gin](#gin-example)
+```go
+var db *gorm.DB = ...
+var req *http.Request = ...
+// or
+// var req *fasthttp.Request
+
+model := db.Where("id > ?", 1).Model(&Article{})
+page := paginate.New().Response(model, req, &[]Article{})
+
+log.Println(page.Total)
+log.Println(page.Items)
+log.Println(page.First)
+log.Println(page.Last)
+
+```
+you can customize config with `paginate.Config` struct.  
+```go
+pg := paginate.New(&paginate.Config{
+    DefaultSize: 50,
+})
+```
+see more about [customize default configuration](#customize-default-configuration).
 
 ## Paginate using http request
 example paging, sorting and filtering:  
@@ -105,7 +137,7 @@ example paging, sorting and filtering:
    http://localhost:3000/
    ```  
 
-## Example Usage
+## Example usage
 
 ### NetHTTP Example
 
@@ -226,7 +258,94 @@ func main() {
 
 ```
 
-# Override results
+## Filter format
+
+The format of filter param is a json encoded of multidimensional array.  
+Maximum array members is three, first index is `column_name`, second index is `operator` and third index is `values`, you can also pass array to values.  
+
+```js
+// Format:
+["column_name", "operator", "values"]
+
+// Example:
+["age", "=", 20]
+// Shortcut:
+["age", 20]
+
+// Produces:
+// WHERE age = 20
+```
+
+Single array member is known as **Logical Operator**.
+```js
+// Example
+[["age", "=", 20],["or"],["age", "=", 25]]
+
+// Produces:
+// WHERE age = 20 OR age = 25
+```
+
+You are allowed to send array inside a value.  
+```js
+["age", "between", [20, 30] ]
+// Produces:
+// WHERE age BETWEEN 20 AND 30
+
+["age", "not in", [20, 21, 22, 23, 24, 25, 26, 26] ]
+// Produces:
+// WHERE age NOT IN(20, 21, 22, 23, 24, 25, 26, 26)
+```
+
+You can filter nested condition with deep array.  
+```js
+[
+    [
+        ["age", ">", 20],
+        ["and"]
+        ["age", "<", 30]
+    ],
+    ["and"],
+    ["name", "like", "john"],
+    ["and"],
+    ["name", "like", "doe"]
+]
+// Produces:
+// WHERE ( (age > 20 AND age < 20) and name like '%john%' and name like '%doe%' )
+```
+
+For `null` value, do not send `null` inside string.
+```js
+// Wrong request
+["age", "is not", "null"]
+
+// Right request
+["age", "is not", null"]
+```
+
+
+## Customize default configuration
+
+You can customize the default configuration with `paginate.Config` struct. 
+
+Config             | Type       | Default               | Description
+------------------ | ---------- | --------------------- | -------------
+Operator           | `string`   | `OR`                  | Default conditional operator if no operator specified. For example `GET /user?filters=[["name","like","jo"],["age",">",20]]`, produces `SELECT * FROM user where name like '%jo' OR age > 20`
+FieldWrapper       | `string`   | `LOWER(%s)`           | FieldWrapper for `LIKE` operator *(for postgres default is: `LOWER((%s)::text)`)*
+DefaultSize        | `int64`    | `10`                  | Default size or limit per page
+SmartSearch        | `bool`     | `false`               | Enable smart search *Experimental feature*
+CustomParamEnabled | `bool`     | `false`               | Enable custom request parameter
+SortParams         | `[]string` | `[]string{"sort"}`    | if `CustomParamEnabled` is `true`, you can set the `SortParams` with custom parameter names. For example: `[]string{"sorting", "ordering", "other_alternative_param"}`. The following requests will capture same result `?sorting=-name` or `?ordering=-name` or `?other_alternative_param=-name` or `?sort=-name`
+PageParams         | `[]string` | `[]string{"page"}`    | if `CustomParamEnabled` is `true`, you can set the `PageParams` with custom parameter names. For example: `[]string{"number", "num", "other_alternative_param"}`. The following requests will capture same result `?number=0` or `?num=0` or `?other_alternative_param=0` or `?page=0`
+SizeParams         | `[]string` | `[]string{"size"}`    | if `CustomParamEnabled` is `true`, you can set the `SizeParams` with custom parameter names. For example: `[]string{"limit", "max", "other_alternative_param"}`. The following requests will capture same result `?limit=50` or `?limit=50` or `?other_alternative_param=50` or `?max=50`
+FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`, you can set the `FilterParams` with custom parameter names. For example: `[]string{"search", "find", "other_alternative_param"}`. The following requests will capture same result `?search=["name","john"]` or `?find=["name","john"]` or `?other_alternative_param=["name","john"]` or `?filters=["name","john"]`
+
+```go
+pg := paginate.New(&paginate.Config{
+    DefaultSize: 50,
+})
+```
+
+## Override results
 
 You can override result with custom function.  
 
@@ -254,6 +373,35 @@ log.Println(result.Items)
 
 ```
 
-# License
+## Limitation
+
+Sometimes gorm pagination doesn't support for customized json or table field name.  
+Make sure your struct properties have same name with gorm column and json property before you expose them.  
+
+Example bad configuration:  
+
+```go
+
+type User struct {
+    gorm.Model
+    UserName       string `gorm:"column:nickname" json:"name"`
+    UserAddress    string `gorm:"column:user_address" json:"address"`
+}
+
+// request: GET /path/to/endpoint?sort=-name,address
+// response: "items": [] with sql error (column name not found)
+```
+
+Best practice:
+```go
+type User struct {
+    gorm.Model
+    Name       string `gorm:"column:name" json:"name"`
+    Address    string `gorm:"column:address" json:"address"`
+}
+
+```
+
+## License
 
 Published under the [MIT License](https://github.com/morkid/paginate/blob/master/LICENSE).

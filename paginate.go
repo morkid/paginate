@@ -191,27 +191,37 @@ func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
 	}
 	if strings.ToUpper(r.Method) == "POST" {
 		decoder := json.NewDecoder(r.Body)
-		var postData map[string]string
-		// var postData parameter
-		if err := decoder.Decode(&postData); nil == err {
-			generateParams(param, p.Config, func(key string) string {
-				value, _ := postData[key]
-				return value
-			})
-			// param = &postData
+		if !p.Config.CustomParamEnabled {
+			var postData parameter
+			if err := decoder.Decode(&postData); nil == err {
+				param = &postData
+			} else {
+				log.Println(err.Error())
+			}
 		} else {
-			log.Println(err.Error())
+			var postData map[string]string
+			if err := decoder.Decode(&postData); nil == err {
+				generateParams(param, p.Config, func(key string) string {
+					value, _ := postData[key]
+					return value
+				})
+			} else {
+				log.Println(err.Error())
+			}
 		}
 	} else if strings.ToUpper(r.Method) == "GET" {
 		query := r.URL.Query()
-		// param.Size = query.Get("size")
-		// param.Page = query.Get("page")
-		// param.Sort = query.Get("sort")
-		// param.Order = query.Get("order")
-		// param.Filters = query.Get("filters")
-		generateParams(param, p.Config, func(key string) string {
-			return query.Get(key)
-		})
+		if !p.Config.CustomParamEnabled {
+			param.Size = query.Get("size")
+			param.Page = query.Get("page")
+			param.Sort = query.Get("sort")
+			param.Order = query.Get("order")
+			param.Filters = query.Get("filters")
+		} else {
+			generateParams(param, p.Config, func(key string) string {
+				return query.Get(key)
+			})
+		}
 	}
 
 	parsingQueryString(param, p)
@@ -222,27 +232,37 @@ func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
 	param := &parameter{}
 	if r.Header.IsPost() {
 		b := r.Body()
-		var postData map[string]string
-		// var postData parameter
-		if err := json.Unmarshal(b, &postData); nil == err {
-			generateParams(param, p.Config, func(key string) string {
-				value, _ := postData[key]
-				return value
-			})
-			// param = &postData
+		if !p.Config.CustomParamEnabled {
+			var postData parameter
+			if err := json.Unmarshal(b, &postData); nil == err {
+				param = &postData
+			} else {
+				log.Println(err.Error())
+			}
 		} else {
-			log.Println(err.Error())
+			var postData map[string]string
+			if err := json.Unmarshal(b, &postData); nil == err {
+				generateParams(param, p.Config, func(key string) string {
+					value, _ := postData[key]
+					return value
+				})
+			} else {
+				log.Println(err.Error())
+			}
 		}
 	} else if r.Header.IsGet() {
 		query := r.URI().QueryArgs()
-		// param.Size = string(query.Peek("size"))
-		// param.Page = string(query.Peek("page"))
-		// param.Sort = string(query.Peek("sort"))
-		// param.Order = string(query.Peek("order"))
-		// param.Filters = string(query.Peek("filters"))
-		generateParams(param, p.Config, func(key string) string {
-			return string(query.Peek(key))
-		})
+		if !p.Config.CustomParamEnabled {
+			param.Size = string(query.Peek("size"))
+			param.Page = string(query.Peek("page"))
+			param.Sort = string(query.Peek("sort"))
+			param.Order = string(query.Peek("order"))
+			param.Filters = string(query.Peek("filters"))
+		} else {
+			generateParams(param, p.Config, func(key string) string {
+				return string(query.Peek(key))
+			})
+		}
 	}
 
 	parsingQueryString(param, p)
@@ -308,12 +328,13 @@ func generateParams(param *parameter, config Config, getValue func(string) strin
 	}
 
 	param.Sort = findValue(config.SortParams, "sort")
-	param.Page = findValue(config.SortParams, "page")
-	param.Size = findValue(config.SortParams, "size")
-	param.Order = findValue(config.SortParams, "order")
-	param.Filters = findValue(config.SortParams, "filters")
+	param.Page = findValue(config.PageParams, "page")
+	param.Size = findValue(config.SizeParams, "size")
+	param.Order = findValue(config.OrderParams, "order")
+	param.Filters = findValue(config.FilterParams, "filters")
 }
 
+//gocyclo:ignore
 func arrayToFilter(arr []interface{}, config Config) pageFilters {
 	filters := pageFilters{
 		Single: false,
@@ -416,6 +437,7 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 	return filters
 }
 
+//gocyclo:ignore
 func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{}) {
 	wheres := []string{}
 	params := []interface{}{}
@@ -534,19 +556,20 @@ func fieldName(field string) string {
 
 }
 
-// Config struct
+// Config for customize pagination result
 type Config struct {
-	Operator     string
-	FieldWrapper string
-	ValueWrapper string
-	DefaultSize  int64
-	SmartSearch  bool
-	Statement    *gorm.Statement `json:"-"`
-	SortParams   []string
-	PageParams   []string
-	OrderParams  []string
-	SizeParams   []string
-	FilterParams []string
+	Operator           string
+	FieldWrapper       string
+	ValueWrapper       string
+	DefaultSize        int64
+	SmartSearch        bool
+	Statement          *gorm.Statement `json:"-"`
+	CustomParamEnabled bool
+	SortParams         []string
+	PageParams         []string
+	OrderParams        []string
+	SizeParams         []string
+	FilterParams       []string
 }
 
 // pageFilters struct
@@ -560,7 +583,7 @@ type pageFilters struct {
 	IsOperator  bool
 }
 
-// Page struct
+// Page result wrapper
 type Page struct {
 	Items      interface{} `json:"items"`
 	Page       int64       `json:"page"`
@@ -601,7 +624,7 @@ type pageRequest struct {
 	Config  Config `json:"-"`
 }
 
-// SortOrder struct
+// sortOrder struct
 type sortOrder struct {
 	Column    string
 	Direction string
