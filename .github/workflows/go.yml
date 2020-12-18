@@ -3,6 +3,10 @@ name: Go
 on:
   push:
     branches: [ master ]
+    paths:
+    - '**.go'
+    - '**.mod'
+    - '**.sum'
   pull_request:
     branches: [ master ]
 

@@ -421,34 +421,33 @@ You can filter nested condition with deep array.
 For `null` value, do not send `null` inside string.
 ```js
 // Wrong request
-["age", "is not", "null"]
+[ "age", "is not", "null" ]
 
 // Right request
-["age", "is not", null"]
+[ "age", "is not", null ]
 ```
-
 
 ## Customize default configuration
 
 You can customize the default configuration with `paginate.Config` struct. 
-
-Config             | Type       | Default               | Description
------------------- | ---------- | --------------------- | -------------
-Operator           | `string`   | `OR`                  | Default conditional operator if no operator specified. For example `GET /user?filters=[["name","like","jo"],["age",">",20]]`, produces `SELECT * FROM user where name like '%jo' OR age > 20`
-FieldWrapper       | `string`   | `LOWER(%s)`           | FieldWrapper for `LIKE` operator *(for postgres default is: `LOWER((%s)::text)`)*
-DefaultSize        | `int64`    | `10`                  | Default size or limit per page
-SmartSearch        | `bool`     | `false`               | Enable smart search *Experimental feature*
-CustomParamEnabled | `bool`     | `false`               | Enable custom request parameter
-SortParams         | `[]string` | `[]string{"sort"}`    | if `CustomParamEnabled` is `true`, you can set the `SortParams` with custom parameter names. For example: `[]string{"sorting", "ordering", "other_alternative_param"}`. The following requests will capture same result `?sorting=-name` or `?ordering=-name` or `?other_alternative_param=-name` or `?sort=-name`
-PageParams         | `[]string` | `[]string{"page"}`    | if `CustomParamEnabled` is `true`, you can set the `PageParams` with custom parameter names. For example: `[]string{"number", "num", "other_alternative_param"}`. The following requests will capture same result `?number=0` or `?num=0` or `?other_alternative_param=0` or `?page=0`
-SizeParams         | `[]string` | `[]string{"size"}`    | if `CustomParamEnabled` is `true`, you can set the `SizeParams` with custom parameter names. For example: `[]string{"limit", "max", "other_alternative_param"}`. The following requests will capture same result `?limit=50` or `?limit=50` or `?other_alternative_param=50` or `?max=50`
-FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`, you can set the `FilterParams` with custom parameter names. For example: `[]string{"search", "find", "other_alternative_param"}`. The following requests will capture same result `?search=["name","john"]` or `?find=["name","john"]` or `?other_alternative_param=["name","john"]` or `?filters=["name","john"]`
 
 ```go
 pg := paginate.New(&paginate.Config{
     DefaultSize: 50,
 })
 ```
+
+Config             | Type       | Default               | Description
+------------------ | ---------- | --------------------- | -------------
+Operator           | `string`   | `OR`                  | Default conditional operator if no operator specified.<br>For example<br>`GET /user?filters=[["name","like","jo"],["age",">",20]]`,<br>produces<br>`SELECT * FROM user where name like '%jo' OR age > 20`
+FieldWrapper       | `string`   | `LOWER(%s)`           | FieldWrapper for `LIKE` operator *(for postgres default is: `LOWER((%s)::text)`)*
+DefaultSize        | `int64`    | `10`                  | Default size or limit per page
+SmartSearch        | `bool`     | `false`               | Enable smart search *Experimental feature*
+CustomParamEnabled | `bool`     | `false`               | Enable custom request parameter
+SortParams         | `[]string` | `[]string{"sort"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SortParams` with custom parameter names.<br>For example: `[]string{"sorting", "ordering", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?sorting=-name` or `?ordering=-name` or `?other_alternative_param=-name` or `?sort=-name`
+PageParams         | `[]string` | `[]string{"page"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `PageParams` with custom parameter names.<br>For example:<br>`[]string{"number", "num", "other_alternative_param"}`.<br>The following requests will capture same result `?number=0`<br>or `?num=0`<br>or `?other_alternative_param=0`<br>or `?page=0`
+SizeParams         | `[]string` | `[]string{"size"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SizeParams` with custom parameter names.<br>For example:<br>`[]string{"limit", "max", "other_alternative_param"}`.<br>The following requests will capture same result `?limit=50`<br>or `?limit=50`<br>or `?other_alternative_param=50`<br>or `?max=50`
+FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`,<br>you can set the `FilterParams` with custom parameter names.<br>For example: `[]string{"search", "find", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?search=["name","john"]`<br>or `?find=["name","john"]`<br>or `?other_alternative_param=["name","john"]`<br>or `?filters=["name","john"]`
 
 ## Override results
 
