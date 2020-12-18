@@ -24,7 +24,7 @@ Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagi
 - [Filter format](#filter-format)
 - [Customize default configuration](#customize-default-configuration)
 - [Override results](#override-results)
-- [Limitation](#limitation)
+- [Limitations](#limitations)
 - [License](#license)
 
 ## Installation
@@ -444,10 +444,10 @@ FieldWrapper       | `string`   | `LOWER(%s)`           | FieldWrapper for `LIKE
 DefaultSize        | `int64`    | `10`                  | Default size or limit per page
 SmartSearch        | `bool`     | `false`               | Enable smart search *(Experimental feature)*
 CustomParamEnabled | `bool`     | `false`               | Enable custom request parameter
-SortParams         | `[]string` | `[]string{"sort"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SortParams` with custom parameter names.<br>For example: `[]string{"sorting", "ordering", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?sorting=-name`<br>or `?ordering=-name`<br>or `?other_alternative_param=-name` or `?sort=-name`
+SortParams         | `[]string` | `[]string{"sort"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SortParams` with custom parameter names.<br>For example: `[]string{"sorting", "ordering", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?sorting=-name`<br>or `?ordering=-name`<br>or `?other_alternative_param=-name`<br>or `?sort=-name`
 PageParams         | `[]string` | `[]string{"page"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `PageParams` with custom parameter names.<br>For example:<br>`[]string{"number", "num", "other_alternative_param"}`.<br>The following requests will capture same result `?number=0`<br>or `?num=0`<br>or `?other_alternative_param=0`<br>or `?page=0`
 SizeParams         | `[]string` | `[]string{"size"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SizeParams` with custom parameter names.<br>For example:<br>`[]string{"limit", "max", "other_alternative_param"}`.<br>The following requests will capture same result `?limit=50`<br>or `?limit=50`<br>or `?other_alternative_param=50`<br>or `?max=50`
-FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`,<br>you can set the `FilterParams` with custom parameter names.<br>For example: `[]string{"search", "find", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?search=["name","john"]`<br>or `?find=["name","john"]`<br>or `?other_alternative_param=["name","john"]`<br>or `?filters=["name","john"]`
+FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`,<br>you can set the `FilterParams` with custom parameter names.<br>For example:<br>`[]string{"search", "find", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?search=["name","john"]`<br>or `?find=["name","john"]`<br>or `?other_alternative_param=["name","john"]`<br>or `?filters=["name","john"]`
 
 ## Override results
 
@@ -477,7 +477,7 @@ log.Println(result.Items)
 
 ```
 
-## Limitation
+## Limitations
 
 Sometimes gorm pagination doesn't support for customized json or table field name.  
 Make sure your struct properties have same name with gorm column and json property before you expose them.  
