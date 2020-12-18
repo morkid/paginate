@@ -16,9 +16,12 @@ Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagi
 - [Example usage](#example-usage)
   - [net/http](#nethttp-example)
   - [Fasthttp](#fasthttp-example)
+  - [Mux Router](#mux-router-example)
   - [Fiber](#fiber-example)
   - [Echo](#echo-example)
   - [Gin](#gin-example)
+  - [Martini](#martini-example)
+  - [Beego](#beego-example)
   - [jQuery DataTable Integration](#jquery-datatable-integration)
   - [jQuery Select2 Integration](#jquery-select2-integration)
 - [Filter format](#filter-format)
@@ -191,6 +194,31 @@ func main() {
 }
 ```
 
+### Mux Router Example
+```go
+package main
+
+import (
+    "github.com/morkid/paginate"
+    ...
+)
+
+func main() {
+    // var db *gorm.DB
+    pg := paginate.New()
+	app := mux.NewRouter()
+	app.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		model := db.Joins("User").Model(&Article{})
+		paginated := pg.Response(model, req, &[]Article{})
+		j, _ := json.Marshal(paginated)
+		w.Header().Set("Content-type", "application/json")
+		w.Write(j)
+	}).Methods("GET")
+	http.Handle("/", app)
+	http.ListenAndServe(":3000", nil)
+}
+```
+
 ### Fiber example
 
 ```go
@@ -258,6 +286,50 @@ func main() {
     app.Run(":3000")
 }
 
+```
+
+### Martini Example
+
+```go
+package main
+
+import (
+    "github.com/morkid/paginate"
+    ...
+)
+
+func main() {
+    // var db *gorm.DB
+    pg := paginate.New()
+	app := martini.Classic()
+	app.Use(render.Renderer())
+	app.Get("/", func(req *http.Request, r render.Render) {
+		model := db.Joins("User").Model(&Article{})
+		r.JSON(200, pg.Response(model, req, &[]Article{}))
+	})
+	app.Run()
+}
+```
+### Beego Example
+
+```go
+package main
+
+import (
+    "github.com/morkid/paginate"
+    ...
+)
+
+func main() {
+    // var db *gorm.DB
+    pg := paginate.New()
+	web.Get("/", func(c *context.Context) {
+		model := db.Joins("User").Model(&Article{})
+		c.Output.JSON(
+			pg.Response(model, c.Request, &[]Article{}), false, false)
+	})
+	web.Run(":3000")
+}
 ```
 
 ### jQuery DataTable Integration
