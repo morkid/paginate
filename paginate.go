@@ -17,12 +17,12 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// Pagination struct
+// Pagination gorm paginate struct
 type Pagination struct {
 	Config *Config
 }
 
-// Response func
+// Response return page of results
 func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) Page {
 	if nil == p.Config {
 		p.Config = &Config{}
@@ -93,7 +93,7 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 	return page
 }
 
-// New func
+// New Pagination instance
 func New(params ...interface{}) *Pagination {
 	if len(params) >= 1 {
 		var config *Config
