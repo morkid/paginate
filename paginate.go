@@ -53,7 +53,7 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 		Unscoped().
 		Table("(?) AS s", query)
 
-	if len(causes.Params) > 0 {
+	if len(causes.Params) > 0 || len(causes.WhereString) > 0 {
 		result = result.Where(causes.WhereString, causes.Params...)
 	}
 
@@ -86,6 +86,16 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 	page.Visible = result.RowsAffected
 	if page.TotalPages > 0 {
 		page.MaxPage = page.TotalPages - 1
+	}
+	if page.TotalPages < 1 {
+		page.TotalPages = 1
+	}
+	if page.MaxPage < 1 {
+		page.MaxPage = 1
+	}
+	if page.Total < 1 {
+		page.MaxPage = 0
+		page.TotalPages = 0
 	}
 	page.Fisrt = causes.Offset < 1
 	page.Last = page.MaxPage == page.Page
@@ -271,10 +281,14 @@ func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
 func parsingQueryString(param *parameter, p *pageRequest) {
 	if i, e := strconv.Atoi(param.Size); nil == e {
 		p.Size = i
-	} else if p.Config.DefaultSize > 0 {
-		p.Size = int(p.Config.DefaultSize)
-	} else {
-		p.Size = 10
+	}
+
+	if p.Size == 0 {
+		if p.Config.DefaultSize > 0 {
+			p.Size = int(p.Config.DefaultSize)
+		} else {
+			p.Size = 10
+		}
 	}
 
 	if i, e := strconv.Atoi(param.Page); nil == e {
@@ -487,12 +501,15 @@ func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{})
 			}
 			switch f.Operator {
 			case "IS", "IS NOT":
-				isNull := f.Value == nil
-				if isNull {
+				if nil == f.Value {
 					wheres = append(wheres, fname, f.Operator, "NULL")
 				} else {
-					wheres = append(wheres, fname, f.Operator, "?")
-					params = append(params, f.Value)
+					if strValue, isStr := f.Value.(string); isStr && strings.ToLower(strValue) == "null" {
+						wheres = append(wheres, fname, f.Operator, "NULL")
+					} else {
+						wheres = append(wheres, fname, f.Operator, "?")
+						params = append(params, f.Value)
+					}
 				}
 			case "BETWEEN":
 				values, ok := f.Value.([]interface{})

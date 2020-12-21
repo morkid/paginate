@@ -490,12 +490,16 @@ You can filter nested condition with deep array.
 // WHERE ( (age > 20 AND age < 20) and name like '%john%' and name like '%doe%' )
 ```
 
-For `null` value, do not send `null` inside string.
+For `null` value, you can send string `"null"` or `null` value, *(lower)*
 ```js
 // Wrong request
-[ "age", "is not", "null" ]
+[ "age", "is not", NULL ]
+[ "age", "is not", Null ]
 
 // Right request
+[ "age", "is not", "NULL" ]
+[ "age", "is not", "Null" ]
+[ "age", "is not", "null" ]
 [ "age", "is not", null ]
 ```
 
