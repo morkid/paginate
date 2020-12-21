@@ -97,7 +97,7 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 		page.MaxPage = 0
 		page.TotalPages = 0
 	}
-	page.Fisrt = causes.Offset < 1
+	page.First = causes.Offset < 1
 	page.Last = page.MaxPage == page.Page
 
 	return page
@@ -609,7 +609,7 @@ type Page struct {
 	TotalPages int64       `json:"total_pages"`
 	Total      int64       `json:"total"`
 	Last       bool        `json:"last"`
-	Fisrt      bool        `json:"first"`
+	First      bool        `json:"first"`
 	Visible    int64       `json:"visible"`
 }
 

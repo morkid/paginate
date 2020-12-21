@@ -555,7 +555,7 @@ log.Println(result.Items)
 
 ## Limitations
 
-Sometimes gorm pagination doesn't support for customized json or table field name.  
+Gorm pagination doesn't support for customized json or table field name.  
 Make sure your struct properties have same name with gorm column and json property before you expose them.  
 
 Example bad configuration:  
