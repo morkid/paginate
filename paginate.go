@@ -565,7 +565,9 @@ func valueFixer(n interface{}) interface{} {
 	}
 	if nil != n && reflect.TypeOf(n).Name() == "float64" {
 		strValue := fmt.Sprintf("%v", n)
-		if match, e := regexp.Match(`^[0-9]$`, []byte(strValue)); nil == e && match {
+		match, e := regexp.Match(`^[0-9]+$`, []byte(strValue))
+		log.Println("VALUE...........", strValue, match)
+		if nil == e && match {
 			v, err := strconv.ParseInt(strValue, 10, 64)
 			if nil == err {
 				return v
