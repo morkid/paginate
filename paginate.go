@@ -340,7 +340,7 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 		Single: false,
 	}
 
-	operatorEscape := regexp.MustCompile(`[^A-z=\<\>\-\+\^/\*%& ]+`)
+	operatorEscape := regexp.MustCompile(`[^A-z=\<\>\-\+\^/\*%&! ]+`)
 	arrayLen := len(arr)
 
 	if len(arr) > 0 {

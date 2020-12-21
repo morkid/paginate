@@ -206,16 +206,16 @@ import (
 func main() {
     // var db *gorm.DB
     pg := paginate.New()
-	app := mux.NewRouter()
-	app.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		model := db.Joins("User").Model(&Article{})
-		paginated := pg.Response(model, req, &[]Article{})
-		j, _ := json.Marshal(paginated)
-		w.Header().Set("Content-type", "application/json")
-		w.Write(j)
-	}).Methods("GET")
-	http.Handle("/", app)
-	http.ListenAndServe(":3000", nil)
+    app := mux.NewRouter()
+    app.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+        model := db.Joins("User").Model(&Article{})
+        paginated := pg.Response(model, req, &[]Article{})
+        j, _ := json.Marshal(paginated)
+        w.Header().Set("Content-type", "application/json")
+        w.Write(j)
+    }).Methods("GET")
+    http.Handle("/", app)
+    http.ListenAndServe(":3000", nil)
 }
 ```
 
@@ -301,13 +301,13 @@ import (
 func main() {
     // var db *gorm.DB
     pg := paginate.New()
-	app := martini.Classic()
-	app.Use(render.Renderer())
-	app.Get("/", func(req *http.Request, r render.Render) {
-		model := db.Joins("User").Model(&Article{})
-		r.JSON(200, pg.Response(model, req, &[]Article{}))
-	})
-	app.Run()
+    app := martini.Classic()
+    app.Use(render.Renderer())
+    app.Get("/", func(req *http.Request, r render.Render) {
+        model := db.Joins("User").Model(&Article{})
+        r.JSON(200, pg.Response(model, req, &[]Article{}))
+    })
+    app.Run()
 }
 ```
 ### Beego Example
@@ -323,12 +323,12 @@ import (
 func main() {
     // var db *gorm.DB
     pg := paginate.New()
-	web.Get("/", func(c *context.Context) {
-		model := db.Joins("User").Model(&Article{})
-		c.Output.JSON(
-			pg.Response(model, c.Request, &[]Article{}), false, false)
-	})
-	web.Run(":3000")
+    web.Get("/", func(c *context.Context) {
+        model := db.Joins("User").Model(&Article{})
+        c.Output.JSON(
+            pg.Response(model, c.Request, &[]Article{}), false, false)
+    })
+    web.Run(":3000")
 }
 ```
 
