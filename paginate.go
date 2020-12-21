@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -515,13 +516,13 @@ func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{})
 				values, ok := f.Value.([]interface{})
 				if ok && len(values) >= 2 {
 					wheres = append(wheres, "(", fname, f.Operator, "? AND ?", ")")
-					params = append(params, values[0], values[1])
+					params = append(params, valueFixer(values[0]), valueFixer(values[1]))
 				}
 			case "IN", "NOT IN":
 				values, ok := f.Value.([]interface{})
 				if ok {
 					wheres = append(wheres, fname, f.Operator, "?")
-					params = append(params, values)
+					params = append(params, valueFixer(values))
 				}
 			case "LIKE", "NOT LIKE", "ILIKE", "NOT ILIKE":
 				if config.FieldWrapper != "" {
@@ -544,12 +545,35 @@ func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{})
 				}
 			default:
 				wheres = append(wheres, fname, f.Operator, "?")
-				params = append(params, f.Value)
+				params = append(params, valueFixer(f.Value))
 			}
 		}
 	}
 
 	return wheres, params
+}
+
+func valueFixer(n interface{}) interface{} {
+	var values []interface{}
+	rawValues, ok := n.([]interface{})
+	if ok {
+		for i := range rawValues {
+			values = append(values, valueFixer(rawValues[i]))
+		}
+
+		return values
+	}
+	if nil != n && reflect.TypeOf(n).Name() == "float64" {
+		strValue := fmt.Sprintf("%v", n)
+		if match, e := regexp.Match(`^[0-9]$`, []byte(strValue)); nil == e && match {
+			v, err := strconv.ParseInt(strValue, 10, 64)
+			if nil == err {
+				return v
+			}
+		}
+	}
+
+	return n
 }
 
 func fieldName(field string) string {
