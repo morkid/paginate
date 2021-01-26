@@ -493,10 +493,17 @@ You can filter nested condition with deep array.
 For `null` value, you can send string `"null"` or `null` value, *(lower)*
 ```js
 // Wrong request
+[ "age", "is", NULL ]
+[ "age", "is", Null ]
 [ "age", "is not", NULL ]
 [ "age", "is not", Null ]
 
 // Right request
+[ "age", "is", "NULL" ]
+[ "age", "is", "Null" ]
+[ "age", "is", "null" ]
+[ "age", "is", null ]
+[ "age", null ]
 [ "age", "is not", "NULL" ]
 [ "age", "is not", "Null" ]
 [ "age", "is not", "null" ]
