@@ -37,8 +37,7 @@ func (p *Pagination) Response(query *gorm.DB, req interface{}, res interface{}) 
 		switch query.Dialector.Name() {
 		case "postgres":
 			p.Config.FieldWrapper = "LOWER((%s)::text)"
-		case "sqlite":
-		case "mysql":
+		case "sqlite", "mysql":
 			p.Config.FieldWrapper = "LOWER(%s)"
 		default:
 			p.Config.FieldWrapper = "LOWER(%s)"
