@@ -381,6 +381,9 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 					}
 				} else if k == 1 {
 					filters.Value = i
+					if nil == i {
+						filters.Operator = "IS"
+					}
 				}
 			} else if arrayLen == 3 {
 				if k == 0 {
