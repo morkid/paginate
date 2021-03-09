@@ -3,13 +3,14 @@ package paginate
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"testing"
 
+	"github.com/morkid/gocache"
 	"github.com/valyala/fasthttp"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -72,7 +73,7 @@ func TestGetNetHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
 	} else {
-		log.Println(parsed.Filters)
+		t.Log(parsed.Filters)
 		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
 }
@@ -127,7 +128,7 @@ func TestGetFastHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
 	} else {
-		log.Println(parsed.Filters)
+		t.Log(parsed.Filters)
 		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
 }
@@ -195,7 +196,7 @@ func TestPostNetHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
 	} else {
-		log.Println(parsed.Filters)
+		t.Log(parsed.Filters)
 		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
 }
@@ -340,6 +341,101 @@ func TestPaginate(t *testing.T) {
 
 	str, err := json.MarshalIndent(result, "", "  ")
 	if nil == err {
-		fmt.Println(string(str))
+		t.Log(string(str))
+	}
+}
+
+type noOpAdapter struct {
+	keyValues map[string]string
+	T         *testing.T
+}
+
+func (n noOpAdapter) Get(key string) (string, error) {
+	n.T.Log(key)
+	if v, ok := n.keyValues[key]; ok {
+		n.T.Log("OK, Cache found! serving data from cache")
+		return v, nil
+	}
+
+	n.T.Log("Cache not found")
+
+	return "", errors.New("Cache not found")
+}
+func (n *noOpAdapter) Set(key string, value string) error {
+	if _, ok := n.keyValues[key]; !ok {
+		n.keyValues = map[string]string{}
+	}
+	n.keyValues[key] = value
+	n.T.Log("Writing cache")
+	return nil
+}
+func (n noOpAdapter) IsValid(key string) bool {
+	if _, ok := n.keyValues[key]; ok {
+		n.T.Log("Cache exists and not expired")
+		return false
+	}
+	n.T.Log("Cache doesn't exists or expired")
+	return true
+}
+func (noOpAdapter) Clear(key string) error {
+	return nil
+}
+func (noOpAdapter) ClearPrefix(keyPrefix string) error {
+	return nil
+}
+func (noOpAdapter) ClearAll() error {
+	return nil
+}
+
+func TestCache(t *testing.T) {
+	type User struct {
+		gorm.Model
+		Name         string `json:"name"`
+		AveragePoint string `json:"average_point"`
+	}
+
+	type Article struct {
+		gorm.Model
+		Title   string `json:"title"`
+		Content string `json:"content"`
+		UserID  uint   `json:"-"`
+		User    User   `json:"user"`
+	}
+	dsn := "file::memory:"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
+	if nil != err {
+		t.Error(err.Error())
+		return
+	}
+	db.AutoMigrate(&User{}, &Article{})
+	users := []User{{Name: "John doe", AveragePoint: "Seventy %"}, {Name: "Jane doe", AveragePoint: "one hundred %"}}
+	articles := []Article{}
+	articles = append(articles, Article{Title: "Written by john", Content: "Example by john", User: users[0]})
+	articles = append(articles, Article{Title: "Written by jane", Content: "Example by jane", User: users[1]})
+	db.Create(&users)
+	db.Create(&articles)
+	request := &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			RawQuery: "page=0&size=10",
+		},
+	}
+
+	var adapter gocache.AdapterInterface = &noOpAdapter{T: t}
+	config := &Config{
+		CacheAdapter: &adapter,
+	}
+	pg := New(config)
+	// set cache
+	model1 := db.Joins("User").Model(&Article{})
+	page1 := pg.With(model1).Request(request).Cache("cache_prefix").Response(&[]Article{})
+
+	// get cache
+	model2 := db.Joins("User").Model(&Article{})
+	page2 := pg.With(model2).Request(request).Cache("cache_prefix").Response(&[]Article{})
+	if page1.Total != page2.Total {
+		t.Error("Total doesn't match")
 	}
 }

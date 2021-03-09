@@ -27,6 +27,15 @@ Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagi
 - [Filter format](#filter-format)
 - [Customize default configuration](#customize-default-configuration)
 - [Override results](#override-results)
+- [Field Selector](#field-selector)
+- [Dynamic Field Selector](#dynamic-field-selector)
+- [Speed up response with cache](#speed-up-response-with-cache)
+  - [In Memory Cache](#in-memory-cache)
+  - [Disk Cache](#disk-cache)
+  - [Redis Cache](#redis-cache)
+  - [Elasticsearch Cache](#elasticsearch-cache)
+  - [Custom cache](#custom-cache)
+  - [Clean up cache](#clean-up-cache)
 - [Limitations](#limitations)
 - [License](#license)
 
@@ -45,7 +54,10 @@ var req *http.Request = ...
 // var req *fasthttp.Request
 
 model := db.Where("id > ?", 1).Model(&Article{})
-page := paginate.New().Response(model, req, &[]Article{})
+pg := paginate.New()
+page := pg.Response(model, req, &[]Article{})
+// or 
+page := pg.With(model).Request(req).Response(&[]Article{})
 
 log.Println(page.Total)
 log.Println(page.Items)
@@ -60,6 +72,10 @@ pg := paginate.New(&paginate.Config{
 })
 ```
 see more about [customize default configuration](#customize-default-configuration).
+
+> Note that `Response` was marked as a deprecated function. Please use `With` instead.  
+> Old: `pg.Response(model, req, &[]Article{})`,  
+> New: `pg.With(model).Request(req).Response(&[]Article{})`
 
 ## Paginate using http request
 example paging, sorting and filtering:  
@@ -527,10 +543,14 @@ FieldWrapper       | `string`   | `LOWER(%s)`           | FieldWrapper for `LIKE
 DefaultSize        | `int64`    | `10`                  | Default size or limit per page
 SmartSearch        | `bool`     | `false`               | Enable smart search *(Experimental feature)*
 CustomParamEnabled | `bool`     | `false`               | Enable custom request parameter
+FieldSelectorEnabled | `bool`   | `false`               | Enable partial response with specific fields. Comma separated per field. eg: `?fields=title,user.name`
 SortParams         | `[]string` | `[]string{"sort"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SortParams` with custom parameter names.<br>For example: `[]string{"sorting", "ordering", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?sorting=-name`<br>or `?ordering=-name`<br>or `?other_alternative_param=-name`<br>or `?sort=-name`
 PageParams         | `[]string` | `[]string{"page"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `PageParams` with custom parameter names.<br>For example:<br>`[]string{"number", "num", "other_alternative_param"}`.<br>The following requests will capture same result `?number=0`<br>or `?num=0`<br>or `?other_alternative_param=0`<br>or `?page=0`
 SizeParams         | `[]string` | `[]string{"size"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SizeParams` with custom parameter names.<br>For example:<br>`[]string{"limit", "max", "other_alternative_param"}`.<br>The following requests will capture same result `?limit=50`<br>or `?limit=50`<br>or `?other_alternative_param=50`<br>or `?max=50`
+OrderParams         | `[]string` | `[]string{"order"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `OrderParams` with custom parameter names.<br>For example:<br>`[]string{"order", "direction", "other_alternative_param"}`.<br>The following requests will capture same result `?order=desc`<br>or `?direction=desc`<br>or `?other_alternative_param=desc`
 FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`,<br>you can set the `FilterParams` with custom parameter names.<br>For example:<br>`[]string{"search", "find", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?search=["name","john"]`<br>or `?find=["name","john"]`<br>or `?other_alternative_param=["name","john"]`<br>or `?filters=["name","john"]`
+FieldsParams       | `[]string` | `[]string{"fields"}`  | if `FieldSelectorEnabled` and `CustomParamEnabled` is `true`,<br>you can set the `FieldsParams` with custom parameter names.<br>For example:<br>`[]string{"fields", "columns", "other_alternative_param"}`.<br>The following requests will capture same result `?fields=title,user.name`<br>or `?columns=title,user.name`<br>or `?other_alternative_param=title,user.name`
+CacheAdapter       | `*gocache.AdapterInterface` | `nil` | the cache adapter, see more about [cache config](#speed-up-response-with-cache).
 
 ## Override results
 
@@ -560,7 +580,267 @@ log.Println(result.Items)
 
 ```
 
+## Field selector
+To implement a custom field selector, struct properties must have a json tag with omitempty.
+
+```go
+// real gorm model
+type User {
+    gorm.Model
+    Name string `json:"name"`
+    Age  int64  `json:"age"`
+}
+
+// fake gorm model
+type UserNullable {
+    ID        *string    `json:"id,omitempty"`
+    CreatedAt *time.Time `json:"created_at,omitempty"`
+    UpdatedAt *time.Time `json:"updated_at,omitempty"`
+    Name     *string    `json:"name,omitempty"`
+    Age      *int64     `json:"age,omitempty"`
+}
+```
+
+```go
+// usage
+nameAndIDOnly := []string{"name","id"}
+model := db.Model(&User{})
+
+page := pg.With(model).
+   Request(req).
+   Fields(nameAndIDOnly).
+   Response([]&UserNullable{})
+```
+
+```javascript
+// response
+{
+    "items": [
+        {
+            "id": 1,
+            "name": "John"
+        }
+    ],
+    ...
+}
+```
+## Dynamic field selector
+If the request contains query parameter `fields` (eg: `?fieilds=name,id`), then the response will show only `name` and `id`. To activate this feature, please set `FieldSelectorEnabled` to `true`.
+```go
+config := paginate.Config{
+    FieldSelectorEnabled: true,
+}
+
+pg := paginate.New(config)
+```
+
+## Speed up response with cache
+You can speed up results without looking database directly with cache adapter. See more about [cache adapter](https://github.com/morkid/gocache).
+
+### In memory cache
+in memory cache is not recommended for production environment:
+```go
+import (
+    "github.com/morkid/gocache"
+    ...
+)
+
+func main() {
+    ...
+    adapterConfig := gocache.InMemoryCacheConfig{
+        ExpiresIn: 1 * time.Hour,
+    }
+    pg := paginate.New(&paginate.Config{
+        CacheAdapter: gocache.NewInMemoryCache(adapterConfig),
+    })
+
+    page := pg.With(model).
+               Request(req).
+               Cache("article"). // set cache name
+               Response(&[]Article{})
+    ...
+}
+```
+
+### Disk cache
+Disk cache will create a file for every single request. You can use disk cache if you don't care about inode.
+```go
+import (
+    "github.com/morkid/gocache"
+    ...
+)
+
+func main() {
+    adapterConfig := gocache.DiskCacheConfig{
+        Directory: "/writable/path/to/my-cache-dir",
+        ExpiresIn: 1 * time.Hour,
+    }
+    pg := paginate.New(&paginate.Config{
+        CacheAdapter: gocache.NewDiskCache(adapterConfig),
+    })
+
+    page := pg.With(model).
+               Request(req).
+               Cache("article"). // set cache name
+               Response(&[]Article{})
+    ...
+}
+```
+
+### Redis cache
+Redis cache require [redis client](https://github.com/go-redis/redis) for golang.
+```go
+import (
+    cache "github.com/morkid/gocache-redis/v8"
+    "github.com/go-redis/redis/v8"
+    ...
+)
+
+func main() {
+    client := redis.NewClient(&redis.Options{
+        Addr:     "localhost:6379",
+        Password: "",
+        DB:       0,
+    })
+
+    adapterConfig := cache.RedisCacheConfig{
+        Client:    client,
+        ExpiresIn: 1 * time.Hour,
+    }
+    pg := paginate.New(&paginate.Config{
+        CacheAdapter: cache.NewRedisCache(adapterConfig),
+    })
+
+    page := pg.With(model).
+               Request(req).
+               Cache("article").
+               Response(&[]Article{})
+    ...
+}
+```
+> if your code already adopts another redis client, you can implement the [redis adapter](https://github.com/morkid/gocache-redis) according to its version. See more about [redis adapter](https://github.com/morkid/gocache-redis).
+
+### Elasticsearch cache
+Elasticsearch cache require official [elasticsearch client](https://github.com/elastic/go-elasticsearch) for golang.
+```go
+import (
+    cache "github.com/morkid/gocache-elasticsearch/v7"
+    "github.com/elastic/go-elasticsearch/v7"
+    ...
+)
+
+func main() {
+    config := elasticsearch.Config{
+        Addresses: []string{
+            "http://localhost:9200",
+        },
+    }
+    es, err := elasticsearch.NewClient(config)
+    if nil != err {
+        panic(err)
+    }
+
+    adapterConfig := cache.ElasticCacheConfig{
+        Client:    es,
+        Index:     "exampleproject",
+        ExpiresIn: 1 * time.Hour,
+    }
+    pg := paginate.New(&paginate.Config{
+        CacheAdapter: cache.NewElasticCache(adapterConfig),
+    })
+
+    page := pg.With(model).
+               Request(req).
+               Cache("article").
+               Response(&[]Article{})
+    ...
+}
+```
+> if your code already adopts another elasticsearch client, you can implement the [elasticsearch adapter](https://github.com/morkid/gocache-elasticsearch) according to its version. See more about [elasticsearch adapter](https://github.com/morkid/gocache-elasticsearch).
+
+### Custom cache
+Create your own cache adapter by implementing [gocache AdapterInterface](https://github.com/morkid/gocache/blob/master/gocache.go). See more about [cache adapter](https://github.com/morkid/gocache).
+```go
+// AdapterInterface interface
+type AdapterInterface interface {
+    // Set cache with key
+    Set(key string, value string) error
+    // Get cache by key
+    Get(key string) (string, error)
+    // IsValid check if cache is valid
+    IsValid(key string) bool
+    // Clear clear cache by key
+    Clear(key string) error
+    // ClearPrefix clear cache by key prefix
+    ClearPrefix(keyPrefix string) error
+    // Clear all cache
+    ClearAll() error
+}
+```
+
+### Clean up cache
+Clear cache by cache name
+```go
+pg.ClearCache("article")
+```
+
+Clear all cache
+```go
+pg.ClearAllCache()
+```
+
+
 ## Limitations
+
+Gorm pagination doesn't support has many relationship. You can make API with separated endpoints for parent and child:
+```javascript
+GET /users
+
+{
+    "items": [
+        {
+            "id": 1,
+            "name": "john",
+            "age": 20,
+            "addresses": [...] // doesn't support
+        }
+    ],
+    ...
+}
+```
+
+Best practice:
+
+```javascript
+GET /users
+{
+    "items": [
+        {
+            "id": 1,
+            "name": "john",
+            "age": 20
+        }
+    ],
+    ...
+}
+
+GET /users/1/addresses
+{
+    "items": [
+        {
+            "id": 1,
+            "name": "home",
+            "street": "home street"
+            "user": {
+                "id": 1,
+                "name": "john",
+                "age": 20
+            }
+        }
+    ],
+    ...
+}
+```
 
 Gorm pagination doesn't support for customized json or table field name.  
 Make sure your struct properties have same name with gorm column and json property before you expose them.  
