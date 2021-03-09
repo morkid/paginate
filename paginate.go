@@ -140,6 +140,7 @@ func (r resContext) Response(res interface{}) Page {
 		hasAdapter = true
 		if cKey != "" && adapter.IsValid(cKey) {
 			if cache, err := adapter.Get(cKey); nil == err {
+				page.Items = res
 				if err := json.Unmarshal([]byte(cache), &page); nil == err {
 					return page
 				}

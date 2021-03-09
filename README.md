@@ -1,4 +1,4 @@
-# Gorm Pagination
+# paginate - Gorm Pagination
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/morkid/paginate.svg)](https://pkg.go.dev/github.com/morkid/paginate)
 [![CircleCI](https://circleci.com/gh/morkid/paginate.svg?style=svg)](https://circleci.com/gh/morkid/paginate)
@@ -7,7 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/morkid/paginate)](https://goreportcard.com/report/github.com/morkid/paginate)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/morkid/paginate)](https://github.com/morkid/paginate/releases)
 
-Simple way to paginate gorm result. [Gorm](https://github.com/go-gorm/gorm) Pagination is compatible for [net/http](https://golang.org/pkg/net/http/) or [fasthttp](https://github.com/valyala/fasthttp). This library also supports many frameworks are based on net/http or fasthttp.
+Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginate** is compatible for [net/http](https://golang.org/pkg/net/http/) and [fasthttp](https://github.com/valyala/fasthttp). This library also supports many frameworks are based on net/http or fasthttp.
 
 ## Table Of Contents
 - [Installation](#installation)
@@ -792,7 +792,7 @@ pg.ClearAllCache()
 
 ## Limitations
 
-Gorm pagination doesn't support has many relationship. You can make API with separated endpoints for parent and child:
+Paginate doesn't support has many relationship. You can make API with separated endpoints for parent and child:
 ```javascript
 GET /users
 
@@ -842,7 +842,7 @@ GET /users/1/addresses
 }
 ```
 
-Gorm pagination doesn't support for customized json or table field name.  
+Paginate doesn't support for customized json or table field name.  
 Make sure your struct properties have same name with gorm column and json property before you expose them.  
 
 Example bad configuration:  
