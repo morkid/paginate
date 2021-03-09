@@ -135,7 +135,7 @@ func (r resContext) Response(res interface{}) Page {
 	var hasAdapter bool = false
 
 	if nil != p.Config.CacheAdapter {
-		cKey = createCacheKey(r.cachePrefix, pr.Filters)
+		cKey = createCacheKey(r.cachePrefix, pr)
 		adapter = *p.Config.CacheAdapter
 		hasAdapter = true
 		if cKey != "" && adapter.IsValid(cKey) {
@@ -839,9 +839,9 @@ type sortOrder struct {
 	Direction string
 }
 
-func createCacheKey(cachePrefix string, pf pageFilters) string {
+func createCacheKey(cachePrefix string, pr pageRequest) string {
 	key := ""
-	if bte, err := json.Marshal(pf); nil == err && cachePrefix != "" {
+	if bte, err := json.Marshal(pr); nil == err && cachePrefix != "" {
 		key = fmt.Sprintf("%s%x", cachePrefix, md5.Sum(bte))
 	}
 
