@@ -783,6 +783,10 @@ Clear cache by cache name
 ```go
 pg.ClearCache("article")
 ```
+Clear multiple cache
+```go
+pg.ClearCache("cache1", "cache2", "cache3")
+```
 
 Clear all cache
 ```go

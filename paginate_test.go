@@ -433,9 +433,17 @@ func TestCache(t *testing.T) {
 	page1 := pg.With(model1).Request(request).Cache("cache_prefix").Response(&[]Article{})
 
 	// get cache
+	var cached []Article
 	model2 := db.Joins("User").Model(&Article{})
-	page2 := pg.With(model2).Request(request).Cache("cache_prefix").Response(&[]Article{})
+	page2 := pg.With(model2).Request(request).Cache("cache_prefix").Response(&cached)
+
+	if len(cached) < 1 {
+		t.Error("Cache pointer not working perfectly")
+	}
+
 	if page1.Total != page2.Total {
 		t.Error("Total doesn't match")
 	}
+
+	pg.ClearCache("cache", "cache_")
 }

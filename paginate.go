@@ -53,11 +53,15 @@ func (p *Pagination) With(stmt *gorm.DB) RequestContext {
 }
 
 // ClearCache clear cache contains prefix
-func (p Pagination) ClearCache(keyPrefix string) {
-	if keyPrefix != "" && nil != p.Config && nil != p.Config.CacheAdapter {
+func (p Pagination) ClearCache(keyPrefixes ...string) {
+	if len(keyPrefixes) > 0 && nil != p.Config && nil != p.Config.CacheAdapter {
 		adapter := *p.Config.CacheAdapter
-		if err := adapter.ClearPrefix(keyPrefix); nil != err {
-			log.Println(err)
+		for i := range keyPrefixes {
+			go func(adapter gocache.AdapterInterface, keyPrefix string) {
+				if err := adapter.ClearPrefix(keyPrefix); nil != err {
+					log.Println(err)
+				}
+			}(adapter, keyPrefixes[i])
 		}
 	}
 }
@@ -66,9 +70,11 @@ func (p Pagination) ClearCache(keyPrefix string) {
 func (p Pagination) ClearAllCache() {
 	if nil != p.Config && nil != p.Config.CacheAdapter {
 		adapter := *p.Config.CacheAdapter
-		if err := adapter.ClearAll(); nil != err {
-			log.Println(err)
-		}
+		go func(adapter gocache.AdapterInterface) {
+			if err := adapter.ClearAll(); nil != err {
+				log.Println(err)
+			}
+		}(adapter)
 	}
 }
 
