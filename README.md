@@ -7,7 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/morkid/paginate)](https://goreportcard.com/report/github.com/morkid/paginate)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/morkid/paginate)](https://github.com/morkid/paginate/releases)
 
-Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginate** is compatible for [net/http](https://golang.org/pkg/net/http/) and [fasthttp](https://github.com/valyala/fasthttp). This library also supports many frameworks are based on net/http or fasthttp.
+Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginate** is compatible with [net/http](https://golang.org/pkg/net/http/) and [fasthttp](https://github.com/valyala/fasthttp). This library also supports many frameworks are based on net/http or fasthttp.
 
 ## Table Of Contents
 - [Installation](#installation)
@@ -421,7 +421,7 @@ $('#mySelect').select2({
     ajax: {
         url: "http://localhost:3000/users",
         processResults: function(json) {
-            json.items.forEach(item => {
+            json.items.forEach(function(item) {
                 item.text = item.name
             })
             // optional
@@ -438,13 +438,12 @@ $('#mySelect').select2({
             var filters = [
                 ["name", "like", params.term]
             ]
-            var custom = {
+
+            return {
                 filters: params.term ? JSON.stringify(filters) : "",
                 sort: "name",
                 page: params.page && params.page - 1 ? params.page - 1 : 0
             }
-
-            return custom
         },
     }
 })
@@ -596,8 +595,8 @@ type UserNullable {
     ID        *string    `json:"id,omitempty"`
     CreatedAt *time.Time `json:"created_at,omitempty"`
     UpdatedAt *time.Time `json:"updated_at,omitempty"`
-    Name     *string    `json:"name,omitempty"`
-    Age      *int64     `json:"age,omitempty"`
+    Name      *string    `json:"name,omitempty"`
+    Age       *int64     `json:"age,omitempty"`
 }
 ```
 
