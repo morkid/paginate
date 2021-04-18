@@ -561,16 +561,21 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 					switch filters.Operator {
 					case "LIKE", "ILIKE", "NOT LIKE", "NOT ILIKE":
 						escapeString := ""
+						escapePattern := `(%|\\)`
 						if nil != config.Statement {
 							driverName := config.Statement.Dialector.Name()
 							switch driverName {
-							case "sqlite", "mysql", "postgres":
+							case "sqlite", "sqlserver", "postgres":
 								escapeString = `\`
 								filters.ValueSuffix = "ESCAPE '\\'"
+							case "mysql":
+								escapeString = `\`
+								filters.ValueSuffix = `ESCAPE '\\'`
 							}
 						}
 						value := fmt.Sprintf("%v", i)
-						value = strings.ReplaceAll(value, "%", escapeString+"%")
+						re := regexp.MustCompile(escapePattern)
+						value = string(re.ReplaceAll([]byte(value), []byte(escapeString+`$1`)))
 						if config.SmartSearch {
 							re := regexp.MustCompile(`[\s]+`)
 							byt := re.ReplaceAll([]byte(value), []byte("%"))
