@@ -163,7 +163,7 @@ func (r resContext) Response(res interface{}) Page {
 					if r.fieldList[j] == pr.Fields[i] {
 						fname := fieldName(pr.Fields[i])
 						if !contains(selects, fname) {
-							selects = append(selects, fname)
+							selects = append(selects, query.Statement.Quote("s."+fname))
 						}
 						break
 					}
@@ -173,7 +173,7 @@ func (r resContext) Response(res interface{}) Page {
 			for i := range r.fieldList {
 				fname := fieldName(r.fieldList[i])
 				if !contains(selects, fname) {
-					selects = append(selects, fname)
+					selects = append(selects, query.Statement.Quote("s."+fname))
 				}
 			}
 		}
@@ -181,7 +181,7 @@ func (r resContext) Response(res interface{}) Page {
 		for i := range pr.Fields {
 			fname := fieldName(pr.Fields[i])
 			if !contains(selects, fname) {
-				selects = append(selects, fname)
+				selects = append(selects, query.Statement.Quote("s."+fname))
 			}
 		}
 	}
@@ -213,7 +213,7 @@ func (r resContext) Response(res interface{}) Page {
 		}
 	}
 
-	result = result.Find(res)
+	rs := result.Find(res)
 
 	page.Items = res
 	f := float64(page.Total) / float64(causes.Limit)
@@ -224,7 +224,7 @@ func (r resContext) Response(res interface{}) Page {
 	page.Page = int64(pr.Page)
 	page.Size = int64(pr.Size)
 	page.MaxPage = 0
-	page.Visible = result.RowsAffected
+	page.Visible = rs.RowsAffected
 	if page.TotalPages > 0 {
 		page.MaxPage = page.TotalPages - 1
 	}
