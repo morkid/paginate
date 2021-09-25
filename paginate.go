@@ -706,6 +706,21 @@ func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{})
 				} else {
 					params = append(params, f.Value)
 				}
+			case "MLIKE":
+				fname = strings.TrimSuffix(fname, "\"")
+				fname = strings.TrimPrefix(fname, "\"")
+
+				cols := strings.Split(fname, ",")
+				cs := len(cols)
+				for i, col := range cols {
+					c := fmt.Sprintf("LOWER((\"%s\")::text)", col)
+					wheres = append(wheres, c, "LIKE", "?")
+					if (cs - 1) != i {
+						wheres = append(wheres, "OR")
+					}
+					p := fmt.Sprintf("%%%s%%", strings.ToLower(valueFixer(f.Value).(string)))
+					params = append(params, p)
+				}
 			default:
 				wheres = append(wheres, fname, f.Operator, "?")
 				params = append(params, valueFixer(f.Value))
