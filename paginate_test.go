@@ -35,7 +35,7 @@ func TestGetNetHttp(t *testing.T) {
 		},
 	}
 
-	parsed := parseRequest(req, Config{})
+	parsed := ParseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -90,7 +90,7 @@ func TestGetFastHttp(t *testing.T) {
 	req.Header.SetMethod("GET")
 	req.URI().SetQueryString(query)
 
-	parsed := parseRequest(req, Config{})
+	parsed := ParseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -158,7 +158,7 @@ func TestPostNetHttp(t *testing.T) {
 		Body:   body,
 	}
 
-	parsed := parseRequest(req, Config{})
+	parsed := ParseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -222,7 +222,7 @@ func TestPostFastHttp(t *testing.T) {
 	req.Header.SetMethod("POST")
 	req.SetBodyString(query)
 
-	parsed := parseRequest(req, Config{})
+	parsed := ParseRequest(req, Config{})
 	if parsed.Size != size {
 		t.Errorf(format, "Size", size, parsed.Size)
 	}
@@ -446,4 +446,89 @@ func TestCache(t *testing.T) {
 	}
 
 	pg.ClearCache("cache", "cache_")
+}
+
+func TestMLIKEPaginate(t *testing.T) {
+	type User struct {
+		gorm.Model
+		Name         string `json:"name"`
+		AveragePoint string `json:"average_point"`
+	}
+
+	type Article struct {
+		gorm.Model
+		Title   string `json:"title"`
+		Content string `json:"content"`
+		UserID  uint   `json:"-"`
+		User    User   `json:"user"`
+	}
+
+	// dsn := "host=127.0.0.1 port=5433 user=postgres password=postgres dbname=postgres sslmode=disable TimeZone=Asia/Jakarta"
+	// dsn := "gorm.db"
+	dsn := "file::memory:?cache=shared"
+
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
+	db.AutoMigrate(&User{}, &Article{})
+
+	users := []User{{Name: "John doe", AveragePoint: "Seventy %"}, {Name: "Jane doe", AveragePoint: "one hundred %"}}
+	articles := []Article{}
+	articles = append(articles, Article{Title: "Written by john", Content: "Example by john", User: users[0]})
+	articles = append(articles, Article{Title: "Written by jane", Content: "Example by jane", User: users[1]})
+
+	if nil != err {
+		t.Error(err.Error())
+		return
+	}
+
+	tx := db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Create(&users).Error; nil != err {
+		tx.Rollback()
+		t.Error(err.Error())
+		return
+	} else if err := tx.Create(&articles).Error; nil != err {
+		tx.Rollback()
+		t.Error(err.Error())
+		return
+	} else if err := tx.Commit().Error; nil != err {
+		tx.Rollback()
+		t.Error(err.Error())
+		return
+	}
+
+	size := 1
+	page := 0
+	sort := "user.name,-id"
+	avg := "y %"
+	data := "filters=%s"
+
+	queryFilter := fmt.Sprintf(`["article.title","mlike","%s"]`, avg)
+	query := fmt.Sprintf(data, page, size, sort, url.QueryEscape(queryFilter))
+
+	request := &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			RawQuery: query,
+		},
+	}
+	response := []Article{}
+
+	t.Log(string("hola"))
+
+	t.Log(response)
+
+	model := db.Model(&Article{})
+	result := New().Response(model, request, &response)
+
+	str, err := json.MarshalIndent(result, "", "  ")
+	if nil == err {
+		t.Log(string(str))
+	}
 }

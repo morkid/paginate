@@ -30,6 +30,7 @@ type ResponseContext interface {
 // RequestContext interface
 type RequestContext interface {
 	Request(interface{}) ResponseContext
+	RequestConfig(Config) ResponseContext
 }
 
 // Pagination gorm paginate struct
@@ -42,6 +43,10 @@ type Pagination struct {
 // Deprecated: Response must not be used. Use With instead
 func (p *Pagination) Response(stmt *gorm.DB, req interface{}, res interface{}) Page {
 	return p.With(stmt).Request(req).Response(res)
+}
+
+func (p *Pagination) ResponseWithConfig(stmt *gorm.DB, config Config, res interface{}) Page {
+	return p.With(stmt).Request(config).Response(res)
 }
 
 // With func
@@ -93,12 +98,24 @@ func (r reqContext) Request(req interface{}) ResponseContext {
 	return response
 }
 
+func (r reqContext) RequestConfig(config Config) ResponseContext {
+	var response ResponseContext = &resContext{
+		Statement:        r.Statement,
+		ConfigPagination: config,
+		Request:          nil,
+		Pagination:       r.Pagination,
+	}
+
+	return response
+}
+
 type resContext struct {
-	Pagination  *Pagination
-	Statement   *gorm.DB
-	Request     interface{}
-	cachePrefix string
-	fieldList   []string
+	Pagination       *Pagination
+	Statement        *gorm.DB
+	Request          interface{}
+	cachePrefix      string
+	fieldList        []string
+	ConfigPagination Config
 }
 
 func (r *resContext) Cache(prefix string) ResponseContext {
@@ -134,7 +151,14 @@ func (r resContext) Response(res interface{}) Page {
 	}
 
 	page := Page{}
-	pr := parseRequest(r.Request, *p.Config)
+	var pr pageRequest
+	if r.Request == nil {
+		pr = pageRequest{
+			Config: r.ConfigPagination,
+		}
+	} else {
+		pr = ParseRequest(r.Request, *p.Config)
+	}
 	causes := createCauses(pr)
 	cKey := ""
 	var adapter gocache.AdapterInterface
@@ -276,7 +300,7 @@ func New(params ...interface{}) *Pagination {
 }
 
 // parseRequest func
-func parseRequest(r interface{}, config Config) pageRequest {
+func ParseRequest(r interface{}, config Config) pageRequest {
 	pr := pageRequest{
 		Config: config,
 	}
