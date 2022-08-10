@@ -223,12 +223,17 @@ func (r resContext) Response(res interface{}) Page {
 		preloadQuery.Find(res)
 	}
 
-	jsonRes, err := json.Marshal(res)
+	resJsonByte, err := json.Marshal(res)
 	if err != nil {
 		return page
 	}
 
-	page.Items = string(jsonRes)
+	var resJson interface{}
+	if err := json.Unmarshal(resJsonByte, &resJson); err != nil {
+		return page
+	}
+
+	page.Items = resJson
 	f := float64(page.Total) / float64(causes.Limit)
 	if math.Mod(f, 1.0) > 0 {
 		f = f + 1
