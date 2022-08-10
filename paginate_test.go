@@ -271,12 +271,20 @@ func TestPaginate(t *testing.T) {
 		AveragePoint string `json:"average_point"`
 	}
 
+	type Address struct {
+		gorm.Model
+		ArticleID uint   `json:"article_id"`
+		City      string `json:"city"`
+		Country   string `json:"country"`
+	}
+
 	type Article struct {
 		gorm.Model
-		Title   string `json:"title"`
-		Content string `json:"content"`
-		UserID  uint   `json:"-"`
-		User    User   `json:"user"`
+		Title     string    `json:"title"`
+		Content   string    `json:"content"`
+		UserID    uint      `json:"-"`
+		User      User      `json:"user"`
+		Addresses []Address `json:"addresses"`
 	}
 
 	// dsn := "host=127.0.0.1 port=5433 user=postgres password=postgres dbname=postgres sslmode=disable TimeZone=Asia/Jakarta"
@@ -286,12 +294,18 @@ func TestPaginate(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
-	db.AutoMigrate(&User{}, &Article{})
+	db.AutoMigrate(&User{}, &Address{}, &Article{})
 
 	users := []User{{Name: "John doe", AveragePoint: "Seventy %"}, {Name: "Jane doe", AveragePoint: "one hundred %"}}
+	addresses := []Address{
+		{ArticleID: 1, City: "Jakarta", Country: "Indonesia"},
+		{ArticleID: 1, City: "Washington", Country: "America"},
+		{ArticleID: 2, City: "Banten", Country: "Indonesia"},
+		{ArticleID: 2, City: "New York", Country: "America"},
+	}
 	articles := []Article{}
-	articles = append(articles, Article{Title: "Written by john", Content: "Example by john", User: users[0]})
-	articles = append(articles, Article{Title: "Written by jane", Content: "Example by jane", User: users[1]})
+	articles = append(articles, Article{Title: "Written by john", Content: "Example by john", UserID: 1})
+	articles = append(articles, Article{Title: "Written by jane", Content: "Example by jane", UserID: 2})
 
 	if nil != err {
 		t.Error(err.Error())
@@ -309,11 +323,18 @@ func TestPaginate(t *testing.T) {
 		tx.Rollback()
 		t.Error(err.Error())
 		return
-	} else if err := tx.Create(&articles).Error; nil != err {
+	}
+	if err := tx.Create(&addresses).Error; nil != err {
 		tx.Rollback()
 		t.Error(err.Error())
 		return
-	} else if err := tx.Commit().Error; nil != err {
+	}
+	if err := tx.Create(&articles).Error; nil != err {
+		tx.Rollback()
+		t.Error(err.Error())
+		return
+	}
+	if err := tx.Commit().Error; nil != err {
 		tx.Rollback()
 		t.Error(err.Error())
 		return
@@ -335,10 +356,8 @@ func TestPaginate(t *testing.T) {
 		},
 	}
 	response := []Article{}
-
-	model := db.Joins("User").Model(&Article{})
+	model := db.Model(&Article{}).Joins("User").Preload("Addresses")
 	result := New().Response(model, request, &response)
-
 	str, err := json.MarshalIndent(result, "", "  ")
 	if nil == err {
 		t.Log(string(str))
