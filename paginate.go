@@ -214,7 +214,7 @@ func (r resContext) Response(res interface{}) Page {
 	}
 
 	if nil != query.Statement.Preloads {
-		preloadQuery := dbs.Model(res)
+		preloadQuery := result.Model(res)
 
 		for table, args := range query.Statement.Preloads {
 			preloadQuery = preloadQuery.Preload(table, args...)
