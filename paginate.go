@@ -202,11 +202,6 @@ func (r resContext) Response(res interface{}) Page {
 		Limit(causes.Limit).
 		Offset(causes.Offset)
 
-	if nil != query.Statement.Preloads {
-		for table, args := range query.Statement.Preloads {
-			result = result.Preload(table, args...)
-		}
-	}
 	if len(causes.Sorts) > 0 {
 		for _, sort := range causes.Sorts {
 			result = result.Order(sort.Column + " " + sort.Direction)
@@ -214,8 +209,26 @@ func (r resContext) Response(res interface{}) Page {
 	}
 
 	result = result.Find(res)
+	if result.Error != nil {
+		return page
+	}
 
-	page.Items = res
+	if nil != query.Statement.Preloads {
+		preloadQuery := dbs.Model(res)
+
+		for table, args := range query.Statement.Preloads {
+			preloadQuery = preloadQuery.Preload(table, args...)
+		}
+
+		preloadQuery.Find(res)
+	}
+
+	jsonRes, err := json.Marshal(res)
+	if err != nil {
+		return page
+	}
+
+	page.Items = string(jsonRes)
 	f := float64(page.Total) / float64(causes.Limit)
 	if math.Mod(f, 1.0) > 0 {
 		f = f + 1
