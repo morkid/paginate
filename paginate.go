@@ -161,9 +161,9 @@ func (r resContext) Response(res interface{}) Page {
 			for i := range pr.Fields {
 				for j := range r.fieldList {
 					if r.fieldList[j] == pr.Fields[i] {
-						fname := fieldName(pr.Fields[i])
+						fname := query.Statement.Quote("s." + fieldName(pr.Fields[i]))
 						if !contains(selects, fname) {
-							selects = append(selects, query.Statement.Quote("s."+fname))
+							selects = append(selects, fname)
 						}
 						break
 					}
@@ -171,17 +171,17 @@ func (r resContext) Response(res interface{}) Page {
 			}
 		} else {
 			for i := range r.fieldList {
-				fname := fieldName(r.fieldList[i])
+				fname := query.Statement.Quote("s." + fieldName(r.fieldList[i]))
 				if !contains(selects, fname) {
-					selects = append(selects, query.Statement.Quote("s."+fname))
+					selects = append(selects, fname)
 				}
 			}
 		}
 	} else if len(pr.Fields) > 0 && p.Config.FieldSelectorEnabled {
 		for i := range pr.Fields {
-			fname := fieldName(pr.Fields[i])
+			fname := query.Statement.Quote("s." + fieldName(pr.Fields[i]))
 			if !contains(selects, fname) {
-				selects = append(selects, query.Statement.Quote("s."+fname))
+				selects = append(selects, fname)
 			}
 		}
 	}
