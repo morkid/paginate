@@ -57,11 +57,9 @@ func (p Pagination) ClearCache(keyPrefixes ...string) {
 	if len(keyPrefixes) > 0 && nil != p.Config && nil != p.Config.CacheAdapter {
 		adapter := *p.Config.CacheAdapter
 		for i := range keyPrefixes {
-			go func(adapter gocache.AdapterInterface, keyPrefix string) {
-				if err := adapter.ClearPrefix(keyPrefix); nil != err {
-					log.Println(err)
-				}
-			}(adapter, keyPrefixes[i])
+			if err := adapter.ClearPrefix(keyPrefixes[i]); nil != err {
+				log.Println(err)
+			}
 		}
 	}
 }
@@ -70,11 +68,9 @@ func (p Pagination) ClearCache(keyPrefixes ...string) {
 func (p Pagination) ClearAllCache() {
 	if nil != p.Config && nil != p.Config.CacheAdapter {
 		adapter := *p.Config.CacheAdapter
-		go func(adapter gocache.AdapterInterface) {
-			if err := adapter.ClearAll(); nil != err {
-				log.Println(err)
-			}
-		}(adapter)
+		if err := adapter.ClearAll(); nil != err {
+			log.Println(err)
+		}
 	}
 }
 
