@@ -286,12 +286,8 @@ func parseRequest(r interface{}, config Config) pageRequest {
 		if netHTTPp, isNetHTTPp := r.(*http.Request); isNetHTTPp {
 			parsingNetHTTPRequest(netHTTPp, &pr)
 		} else {
-			if fastHTTP, isFastHTTP := r.(fasthttp.Request); isFastHTTP {
-				parsingFastHTTPRequest(&fastHTTP, &pr)
-			} else {
-				if fastHTTPp, isFastHTTPp := r.(*fasthttp.Request); isFastHTTPp {
-					parsingFastHTTPRequest(fastHTTPp, &pr)
-				}
+			if fastHTTPp, isFastHTTPp := r.(*fasthttp.Request); isFastHTTPp {
+				parsingFastHTTPRequest(fastHTTPp, &pr)
 			}
 		}
 	}
