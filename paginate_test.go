@@ -346,11 +346,13 @@ func TestPaginate(t *testing.T) {
 }
 
 type noOpAdapter struct {
-	keyValues map[string]string
-	T         *testing.T
+	keyValues          map[string]string
+	T                  *testing.T
+	clearCounter       int
+	clearPrefixCounter int
 }
 
-func (n noOpAdapter) Get(key string) (string, error) {
+func (n *noOpAdapter) Get(key string) (string, error) {
 	n.T.Log(key)
 	if v, ok := n.keyValues[key]; ok {
 		n.T.Log("OK, Cache found! serving data from cache")
@@ -369,7 +371,7 @@ func (n *noOpAdapter) Set(key string, value string) error {
 	n.T.Log("Writing cache")
 	return nil
 }
-func (n noOpAdapter) IsValid(key string) bool {
+func (n *noOpAdapter) IsValid(key string) bool {
 	if _, ok := n.keyValues[key]; ok {
 		n.T.Log("Cache exists and not expired")
 		return false
@@ -377,13 +379,21 @@ func (n noOpAdapter) IsValid(key string) bool {
 	n.T.Log("Cache doesn't exists or expired")
 	return true
 }
-func (noOpAdapter) Clear(key string) error {
+func (n *noOpAdapter) Clear(key string) error {
 	return nil
 }
-func (noOpAdapter) ClearPrefix(keyPrefix string) error {
+func (n *noOpAdapter) ClearPrefix(keyPrefix string) error {
+	if n.clearPrefixCounter > 2 {
+		return errors.New("maximum clear")
+	}
+	n.clearPrefixCounter = n.clearPrefixCounter + 1
 	return nil
 }
-func (noOpAdapter) ClearAll() error {
+func (n *noOpAdapter) ClearAll() error {
+	if n.clearCounter > 0 {
+		return errors.New("maximum clear")
+	}
+	n.clearCounter = n.clearCounter + 1
 	return nil
 }
 
@@ -394,12 +404,19 @@ func TestCache(t *testing.T) {
 		AveragePoint string `json:"average_point"`
 	}
 
+	type Category struct {
+		gorm.Model
+		Name string `json:"name"`
+	}
+
 	type Article struct {
 		gorm.Model
-		Title   string `json:"title"`
-		Content string `json:"content"`
-		UserID  uint   `json:"-"`
-		User    User   `json:"user"`
+		Title      string   `json:"title"`
+		Content    string   `json:"content"`
+		UserID     uint     `json:"-"`
+		CategoryID uint     `json:"-"`
+		User       User     `json:"user"`
+		Category   Category `json:"category"`
 	}
 	dsn := "file::memory:"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
@@ -410,27 +427,34 @@ func TestCache(t *testing.T) {
 		return
 	}
 	db.AutoMigrate(&User{}, &Article{})
+	categories := []Category{{Name: "Blog"}}
 	users := []User{{Name: "John doe", AveragePoint: "Seventy %"}, {Name: "Jane doe", AveragePoint: "one hundred %"}}
 	articles := []Article{}
-	articles = append(articles, Article{Title: "Written by john", Content: "Example by john", User: users[0]})
-	articles = append(articles, Article{Title: "Written by jane", Content: "Example by jane", User: users[1]})
+	articles = append(articles, Article{Title: "Written by john", Content: "Example by john", UserID: 1, CategoryID: 1})
+	articles = append(articles, Article{Title: "Written by jane", Content: "Example by jane", UserID: 2, CategoryID: 1})
+	db.Create(&categories)
 	db.Create(&users)
 	db.Create(&articles)
 	request := &http.Request{
 		Method: "GET",
 		URL: &url.URL{
-			RawQuery: "page=0&size=10",
+			RawQuery: "page=0&size=10&fields=id",
 		},
 	}
 
 	var adapter gocache.AdapterInterface = &noOpAdapter{T: t}
 	config := &Config{
-		CacheAdapter: &adapter,
+		CacheAdapter:         &adapter,
+		FieldSelectorEnabled: true,
 	}
 	pg := New(config)
 	// set cache
-	model1 := db.Joins("User").Model(&Article{})
-	page1 := pg.With(model1).Request(request).Cache("cache_prefix").Response(&[]Article{})
+	model1 := db.Joins("User").Model(&Article{}).Preload(`Category`)
+	page1 := pg.With(model1).
+		Request(request).
+		Fields([]string{"id"}).
+		Cache("cache_prefix").
+		Response(&[]Article{})
 
 	// get cache
 	var cached []Article
@@ -446,4 +470,7 @@ func TestCache(t *testing.T) {
 	}
 
 	pg.ClearCache("cache", "cache_")
+	pg.ClearCache("cache", "cache_")
+	pg.ClearAllCache()
+	pg.ClearAllCache()
 }

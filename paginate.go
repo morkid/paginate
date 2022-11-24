@@ -3,8 +3,8 @@ package paginate
 import (
 	"crypto/md5"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -110,22 +110,22 @@ func (r *resContext) Fields(fields []string) ResponseContext {
 func (r resContext) Response(res interface{}) Page {
 	p := r.Pagination
 	query := r.Statement
-	if nil == p.Config {
-		p.Config = &Config{}
-	}
+	p.Config = defaultConfig(p.Config)
 	p.Config.Statement = query.Statement
 	if p.Config.DefaultSize == 0 {
 		p.Config.DefaultSize = 10
 	}
 
 	if p.Config.FieldWrapper == "" && p.Config.ValueWrapper == "" {
-		switch query.Dialector.Name() {
-		case "postgres":
-			p.Config.FieldWrapper = "LOWER((%s)::text)"
-		case "sqlite", "mysql":
-			p.Config.FieldWrapper = "LOWER(%s)"
-		default:
-			p.Config.FieldWrapper = "LOWER(%s)"
+		defaultWrapper := "LOWER(%s)"
+		wrappers := map[string]string{
+			"sqlite":   defaultWrapper,
+			"mysql":    defaultWrapper,
+			"postgres": "LOWER((%s)::text)",
+		}
+		p.Config.FieldWrapper = defaultWrapper
+		if wrapper, ok := wrappers[query.Dialector.Name()]; ok {
+			p.Config.FieldWrapper = wrapper
 		}
 	}
 
@@ -143,7 +143,7 @@ func (r resContext) Response(res interface{}) Page {
 		if cKey != "" && adapter.IsValid(cKey) {
 			if cache, err := adapter.Get(cKey); nil == err {
 				page.Items = res
-				if err := json.Unmarshal([]byte(cache), &page); nil == err {
+				if err := p.Config.JSONUnmarshal([]byte(cache), &page); nil == err {
 					return page
 				}
 			}
@@ -238,7 +238,7 @@ func (r resContext) Response(res interface{}) Page {
 	page.Last = page.MaxPage == page.Page
 
 	if hasAdapter && cKey != "" {
-		if cache, err := json.Marshal(page); nil == err {
+		if cache, err := p.Config.JSONMarshal(page); nil == err {
 			if err := adapter.Set(cKey, string(cache)); err != nil {
 				log.Println(err)
 			}
@@ -260,21 +260,16 @@ func New(params ...interface{}) *Pagination {
 			}
 		}
 
-		if nil == config {
-			e := errors.New("Invalid argument, first argument of paginate.New() must be instance of *paginate.Config")
-			log.Println(e)
-		}
-
-		return &Pagination{Config: config}
+		return &Pagination{Config: defaultConfig(config)}
 	}
 
-	return &Pagination{Config: &Config{}}
+	return &Pagination{Config: defaultConfig(nil)}
 }
 
 // parseRequest func
 func parseRequest(r interface{}, config Config) pageRequest {
 	pr := pageRequest{
-		Config: config,
+		Config: *defaultConfig(&config),
 	}
 	if netHTTP, isNetHTTP := r.(http.Request); isNetHTTP {
 		parsingNetHTTPRequest(&netHTTP, &pr)
@@ -300,7 +295,7 @@ func createFilters(filterParams interface{}, p *pageRequest) {
 		p.Filters.Fields = p.Fields
 	} else if ok2 {
 		iface := []interface{}{}
-		if e := json.Unmarshal([]byte(s), &iface); nil == e && len(iface) > 0 {
+		if e := p.Config.JSONUnmarshal([]byte(s), &iface); nil == e && len(iface) > 0 {
 			p.Filters = arrayToFilter(iface, p.Config)
 		}
 		p.Filters.Fields = p.Fields
@@ -338,17 +333,21 @@ func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
 		r.Method = "GET"
 	}
 	if strings.ToUpper(r.Method) == "POST" {
-		decoder := json.NewDecoder(r.Body)
+		body, err := ioutil.ReadAll(r.Body)
+		if nil != err {
+			body = []byte("{}")
+		}
+		defer r.Body.Close()
 		if !p.Config.CustomParamEnabled {
 			var postData parameter
-			if err := decoder.Decode(&postData); nil == err {
+			if err := p.Config.JSONUnmarshal(body, &postData); nil == err {
 				param = &postData
 			} else {
 				log.Println(err.Error())
 			}
 		} else {
 			var postData map[string]string
-			if err := decoder.Decode(&postData); nil == err {
+			if err := p.Config.JSONUnmarshal(body, &postData); nil == err {
 				generateParams(param, p.Config, func(key string) string {
 					value, _ := postData[key]
 					return value
@@ -383,14 +382,14 @@ func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
 		b := r.Body()
 		if !p.Config.CustomParamEnabled {
 			var postData parameter
-			if err := json.Unmarshal(b, &postData); nil == err {
+			if err := p.Config.JSONUnmarshal(b, &postData); nil == err {
 				param = &postData
 			} else {
 				log.Println(err.Error())
 			}
 		} else {
 			var postData map[string]string
-			if err := json.Unmarshal(b, &postData); nil == err {
+			if err := p.Config.JSONUnmarshal(b, &postData); nil == err {
 				generateParams(param, p.Config, func(key string) string {
 					value, _ := postData[key]
 					return value
@@ -779,7 +778,9 @@ type Config struct {
 	FilterParams         []string
 	FieldsParams         []string
 	FieldSelectorEnabled bool
-	CacheAdapter         *gocache.AdapterInterface `json:"-"`
+	CacheAdapter         *gocache.AdapterInterface              `json:"-"`
+	JSONMarshal          func(v interface{}) ([]byte, error)    `json:"-"`
+	JSONUnmarshal        func(data []byte, v interface{}) error `json:"-"`
 }
 
 // pageFilters struct
@@ -845,9 +846,28 @@ type sortOrder struct {
 
 func createCacheKey(cachePrefix string, pr pageRequest) string {
 	key := ""
-	if bte, err := json.Marshal(pr); nil == err && cachePrefix != "" {
+	if bte, err := pr.Config.JSONMarshal(pr); nil == err && cachePrefix != "" {
 		key = fmt.Sprintf("%s%x", cachePrefix, md5.Sum(bte))
 	}
 
 	return key
+}
+
+func defaultConfig(c *Config) *Config {
+	if nil == c {
+		return &Config{
+			JSONMarshal:   json.Marshal,
+			JSONUnmarshal: json.Unmarshal,
+		}
+	}
+
+	if nil == c.JSONMarshal {
+		c.JSONMarshal = json.Marshal
+	}
+
+	if nil == c.JSONUnmarshal {
+		c.JSONUnmarshal = json.Unmarshal
+	}
+
+	return c
 }
