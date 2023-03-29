@@ -48,6 +48,11 @@ go get -u github.com/morkid/paginate
 ## Configuration
 
 ```go
+// gorm.Config.QueryFields must false for avoid error in pagination
+config := gorm.Config{
+    QueryFields: false,
+}
+
 var db *gorm.DB = ...
 var req *http.Request = ...
 // or
