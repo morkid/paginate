@@ -198,6 +198,11 @@ func (r resContext) Response(res interface{}) Page {
 		Limit(causes.Limit).
 		Offset(causes.Offset)
 
+	if result.Error != nil {
+		page.Error = result.Error
+		return page
+	}
+
 	if nil != query.Statement.Preloads {
 		for table, args := range query.Statement.Preloads {
 			result = result.Preload(table, args...)
@@ -210,6 +215,10 @@ func (r resContext) Response(res interface{}) Page {
 	}
 
 	rs := result.Find(res)
+	if rs.Error != nil {
+		page.Error = rs.Error
+		return page
+	}
 
 	page.Items = res
 	f := float64(page.Total) / float64(causes.Limit)
@@ -806,6 +815,7 @@ type Page struct {
 	Last       bool        `json:"last"`
 	First      bool        `json:"first"`
 	Visible    int64       `json:"visible"`
+	Error      error       `json:"error"`
 }
 
 // parameter struct
