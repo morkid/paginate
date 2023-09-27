@@ -10,6 +10,7 @@ Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginat
 ## Table Of Contents
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Pagination Result](#pagination-result)
 - [Paginate using http request](#paginate-using-http-request)
 - [Example usage](#example-usage)
   - [net/http](#nethttp-example)
@@ -75,6 +76,59 @@ see more about [customize default configuration](#customize-default-configuratio
 > Old: `pg.Response(model, req, &[]Article{})`,  
 > New: `pg.With(model).Request(req).Response(&[]Article{})`
 
+## Pagination Result
+
+```js
+{
+    // the result items
+    "items": *[]any, 
+    
+    // total results
+    // including next pages
+    "total": number,   
+
+    // Current page
+    // (provided by request parameter, eg: ?page=1)
+    // note: page is always start from 0
+    "page": number,
+    
+    // Current size
+    // (provided by request parameter, eg: ?size=10)
+    // note: negative value means unlimited
+    "size": number,    
+
+    // Total Pages
+    "total_pages": number,
+
+    // Max Page
+    // start from 0 until last index
+    // example: 
+    //   if you have 3 pages (page0, page1, page2)
+    //   max_page is 2 not 3
+    "max_page": number,
+
+    // Last Page is true if the page 
+    // has reached the end of the page
+    "last": bool,
+
+    // Fist Page is true if the page is 0
+    "fist": bool,
+
+    // Visible
+    // total visible items
+    "visible": number,
+
+    // Error
+    // true if an error has occurred and
+    // paginage.Config.ErrorEnabled is true
+    "error": bool,
+
+    // Error Message
+    // current error if available and
+    // paginage.Config.ErrorEnabled is true
+    "error_message": string,
+}
+```
 ## Paginate using http request
 example paging, sorting and filtering:  
 1. `http://localhost:3000/?size=10&page=0&sort=-name`  
