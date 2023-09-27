@@ -1,9 +1,7 @@
 # paginate - Gorm Pagination
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/morkid/paginate.svg)](https://pkg.go.dev/github.com/morkid/paginate)
-[![CircleCI](https://circleci.com/gh/morkid/paginate.svg?style=svg)](https://circleci.com/gh/morkid/paginate)
 [![Github Actions](https://github.com/morkid/paginate/workflows/Go/badge.svg)](https://github.com/morkid/paginate/actions)
-[![Build Status](https://travis-ci.com/morkid/paginate.svg?branch=master)](https://travis-ci.com/morkid/paginate)
 [![Go Report Card](https://goreportcard.com/badge/github.com/morkid/paginate)](https://goreportcard.com/report/github.com/morkid/paginate)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/morkid/paginate)](https://github.com/morkid/paginate/releases)
 
@@ -12,6 +10,7 @@ Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginat
 ## Table Of Contents
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Pagination Result](#pagination-result)
 - [Paginate using http request](#paginate-using-http-request)
 - [Example usage](#example-usage)
   - [net/http](#nethttp-example)
@@ -77,6 +76,59 @@ see more about [customize default configuration](#customize-default-configuratio
 > Old: `pg.Response(model, req, &[]Article{})`,  
 > New: `pg.With(model).Request(req).Response(&[]Article{})`
 
+## Pagination Result
+
+```js
+{
+    // the result items
+    "items": *[]any, 
+    
+    // total results
+    // including next pages
+    "total": number,   
+
+    // Current page
+    // (provided by request parameter, eg: ?page=1)
+    // note: page is always start from 0
+    "page": number,
+    
+    // Current size
+    // (provided by request parameter, eg: ?size=10)
+    // note: negative value means unlimited
+    "size": number,    
+
+    // Total Pages
+    "total_pages": number,
+
+    // Max Page
+    // start from 0 until last index
+    // example: 
+    //   if you have 3 pages (page0, page1, page2)
+    //   max_page is 2 not 3
+    "max_page": number,
+
+    // Last Page is true if the page 
+    // has reached the end of the page
+    "last": bool,
+
+    // Fist Page is true if the page is 0
+    "fist": bool,
+
+    // Visible
+    // total visible items
+    "visible": number,
+
+    // Error
+    // true if an error has occurred and
+    // paginage.Config.ErrorEnabled is true
+    "error": bool,
+
+    // Error Message
+    // current error if available and
+    // paginage.Config.ErrorEnabled is true
+    "error_message": string,
+}
+```
 ## Paginate using http request
 example paging, sorting and filtering:  
 1. `http://localhost:3000/?size=10&page=0&sort=-name`  
@@ -550,6 +602,7 @@ OrderParams         | `[]string` | `[]string{"order"}`    | if `CustomParamEnabl
 FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`,<br>you can set the `FilterParams` with custom parameter names.<br>For example:<br>`[]string{"search", "find", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?search=["name","john"]`<br>or `?find=["name","john"]`<br>or `?other_alternative_param=["name","john"]`<br>or `?filters=["name","john"]`
 FieldsParams       | `[]string` | `[]string{"fields"}`  | if `FieldSelectorEnabled` and `CustomParamEnabled` is `true`,<br>you can set the `FieldsParams` with custom parameter names.<br>For example:<br>`[]string{"fields", "columns", "other_alternative_param"}`.<br>The following requests will capture same result `?fields=title,user.name`<br>or `?columns=title,user.name`<br>or `?other_alternative_param=title,user.name`
 CacheAdapter       | `*gocache.AdapterInterface` | `nil` | the cache adapter, see more about [cache config](#speed-up-response-with-cache).
+ErrorEnabled       | `bool` | `false` | Show error message in pagination result.
 
 ## Override results
 

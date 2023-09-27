@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"testing"
@@ -151,7 +151,7 @@ func TestPostNetHttp(t *testing.T) {
 	queryFilter := fmt.Sprintf(`[["user.average_point","like","%s"]]`, avg)
 	query := fmt.Sprintf(data, page, size, sort, queryFilter)
 
-	body := ioutil.NopCloser(bytes.NewReader([]byte(query)))
+	body := io.NopCloser(bytes.NewReader([]byte(query)))
 
 	req := &http.Request{
 		Method: "POST",
@@ -284,7 +284,7 @@ func TestPaginate(t *testing.T) {
 	dsn := "file::memory:?cache=shared"
 
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Discard,
 	})
 	db.AutoMigrate(&User{}, &Article{})
 
@@ -299,11 +299,6 @@ func TestPaginate(t *testing.T) {
 	}
 
 	tx := db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
 
 	if err := tx.Create(&users).Error; nil != err {
 		tx.Rollback()
@@ -337,11 +332,28 @@ func TestPaginate(t *testing.T) {
 	response := []Article{}
 
 	model := db.Joins("User").Model(&Article{})
-	result := New().Response(model, request, &response)
+	result := New().With(model).Request(request).Response(&response)
 
-	str, err := json.MarshalIndent(result, "", "  ")
-	if nil == err {
-		t.Log(string(str))
+	_, err = json.MarshalIndent(result, "", "  ")
+	if nil != err {
+		t.Error(err)
+	}
+
+	queryFilter = fmt.Sprintf(`[["users.average_point","like","%s"],["AND"],["user.name","IS NOT",null],["id","like","1"]]`, avg)
+	query = fmt.Sprintf(data, page, size, sort, url.QueryEscape(queryFilter))
+
+	request = &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			RawQuery: query,
+		},
+	}
+	response = []Article{}
+
+	model = db.Joins("User").Model(&Article{})
+	result = New(&Config{ErrorEnabled: true}).With(model).Request(request).Response(&response)
+	if !result.Error {
+		t.Error("Failed to get error message")
 	}
 }
 
@@ -420,7 +432,7 @@ func TestCache(t *testing.T) {
 	}
 	dsn := "file::memory:"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Discard,
 	})
 	if nil != err {
 		t.Error(err.Error())

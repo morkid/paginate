@@ -4,7 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -41,6 +41,7 @@ type Pagination struct {
 //
 // Deprecated: Response must not be used. Use With instead
 func (p *Pagination) Response(stmt *gorm.DB, req interface{}, res interface{}) Page {
+	fmt.Println("paginate.Response(stmt, req, res) is deprecated! please use paginate.With(stmt).Request(req).Response(res) instead")
 	return p.With(stmt).Request(req).Response(res)
 }
 
@@ -198,9 +199,11 @@ func (r resContext) Response(res interface{}) Page {
 		Limit(causes.Limit).
 		Offset(causes.Offset)
 
-	if result.Error != nil {
-		page.Error = result.Error
-		return page
+	page.RawError = result.Error
+
+	if result.Error != nil && p.Config.ErrorEnabled {
+		page.Error = true
+		page.ErrorMessage = result.Error.Error()
 	}
 
 	if nil != query.Statement.Preloads {
@@ -215,9 +218,13 @@ func (r resContext) Response(res interface{}) Page {
 	}
 
 	rs := result.Find(res)
-	if rs.Error != nil {
-		page.Error = rs.Error
-		return page
+	if nil == page.RawError {
+		page.RawError = rs.Error
+	}
+
+	if rs.Error != nil && p.Config.ErrorEnabled && !page.Error {
+		page.Error = true
+		page.ErrorMessage = rs.Error.Error()
 	}
 
 	page.Items = res
@@ -236,9 +243,7 @@ func (r resContext) Response(res interface{}) Page {
 	if page.TotalPages < 1 {
 		page.TotalPages = 1
 	}
-	if page.MaxPage < 1 {
-		page.MaxPage = 1
-	}
+
 	if page.Total < 1 {
 		page.MaxPage = 0
 		page.TotalPages = 0
@@ -342,7 +347,7 @@ func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
 		r.Method = "GET"
 	}
 	if strings.ToUpper(r.Method) == "POST" {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if nil != err {
 			body = []byte("{}")
 		}
@@ -509,7 +514,6 @@ func generateParams(param *parameter, config Config, getValue func(string) strin
 	param.Fields = findValue(config.FieldsParams, "fields")
 }
 
-//gocyclo:ignore
 func arrayToFilter(arr []interface{}, config Config) pageFilters {
 	filters := pageFilters{
 		Single: false,
@@ -592,7 +596,7 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 			separatedSubFilters := []pageFilters{}
 			hasOperator := false
 			defaultOperator := config.Operator
-			if "" == defaultOperator {
+			if defaultOperator == "" {
 				defaultOperator = "OR"
 			}
 			for k, s := range subFilters {
@@ -790,6 +794,7 @@ type Config struct {
 	CacheAdapter         *gocache.AdapterInterface              `json:"-"`
 	JSONMarshal          func(v interface{}) ([]byte, error)    `json:"-"`
 	JSONUnmarshal        func(data []byte, v interface{}) error `json:"-"`
+	ErrorEnabled         bool
 }
 
 // pageFilters struct
@@ -806,16 +811,18 @@ type pageFilters struct {
 
 // Page result wrapper
 type Page struct {
-	Items      interface{} `json:"items"`
-	Page       int64       `json:"page"`
-	Size       int64       `json:"size"`
-	MaxPage    int64       `json:"max_page"`
-	TotalPages int64       `json:"total_pages"`
-	Total      int64       `json:"total"`
-	Last       bool        `json:"last"`
-	First      bool        `json:"first"`
-	Visible    int64       `json:"visible"`
-	Error      error       `json:"error"`
+	Items        interface{} `json:"items"`
+	Page         int64       `json:"page"`
+	Size         int64       `json:"size"`
+	MaxPage      int64       `json:"max_page"`
+	TotalPages   int64       `json:"total_pages"`
+	Total        int64       `json:"total"`
+	Last         bool        `json:"last"`
+	First        bool        `json:"first"`
+	Visible      int64       `json:"visible"`
+	Error        bool        `json:"error,omitempty"`
+	ErrorMessage string      `json:"error_message,omitempty"`
+	RawError     error       `json:"-"`
 }
 
 // parameter struct
