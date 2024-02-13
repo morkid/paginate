@@ -331,7 +331,7 @@ func createCauses(p pageRequest) requestQuery {
 	}
 
 	query.Limit = p.Size
-	query.Offset = p.Page * p.Size
+	query.Offset = (p.Page - 1) * p.Size
 	query.Wheres = wheres
 	query.WhereString = strings.Join(wheres, " ")
 	query.Sorts = sorts
