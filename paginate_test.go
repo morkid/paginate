@@ -264,6 +264,47 @@ func TestPostFastHttp(t *testing.T) {
 	}
 }
 
+func TestPostFastHttpParseStartsWith(t *testing.T) {
+	size := 20
+	page := 1
+	sort := "user.name,-id"
+	avg := "seventy%"
+
+	data := `
+		{
+			"page": "%d",
+			"size": "%d",
+			"sort": "%s",
+			"filters": %s
+		}
+	`
+
+	queryFilter := fmt.Sprintf(`[["username","startsWith","%s"]]`, avg)
+	query := fmt.Sprintf(data, page, size, sort, queryFilter)
+
+	req := &fasthttp.Request{}
+	req.Header.SetMethod("POST")
+	req.SetBodyString(query)
+
+	parsed := parseRequest(req, Config{})
+	filters, ok := parsed.Filters.Value.([]pageFilters)
+	if ok {
+		if filters[0].Column != "username" {
+			t.Errorf(format, "Filter field for username", "username", filters[0].Column)
+		}
+		if filters[0].Operator != "LIKE" {
+			t.Errorf(format, "Filter operator for username", "LIKE", filters[0].Operator)
+		}
+		value, isValid := filters[0].Value.(string)
+		expected := avg
+		if !isValid || value != expected {
+			t.Errorf(format, "Filter operator for username", expected, value)
+		}
+	} else {
+		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
+	}
+}
+
 func TestPaginate(t *testing.T) {
 	type User struct {
 		gorm.Model

@@ -586,6 +586,9 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 							value = string(byt)
 						}
 						filters.Value = fmt.Sprintf("%s%s%s", "%", value, "%")
+					case "STARTSWITH":
+						filters.Operator = "LIKE"
+						filters.Value = i
 					default:
 						filters.Value = i
 					}
