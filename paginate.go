@@ -563,7 +563,7 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 					}
 				} else if k == 2 {
 					switch filters.Operator {
-					case "LIKE", "ILIKE", "NOT LIKE", "NOT ILIKE":
+					case "LIKE", "ILIKE", "NOT LIKE", "NOT ILIKE", "STARTSWITH", "ENDSWITH", "ELIKE":
 						escapeString := ""
 						escapePattern := `(%|\\)`
 						if nil != config.Statement {
@@ -585,10 +585,18 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 							byt := re.ReplaceAll([]byte(value), []byte("%"))
 							value = string(byt)
 						}
-						filters.Value = fmt.Sprintf("%s%s%s", "%", value, "%")
-					case "STARTSWITH":
-						filters.Operator = "LIKE"
-						filters.Value = i
+						if filters.Operator == "STARTSWITH" {
+							filters.Operator = "LIKE"
+							filters.Value = fmt.Sprintf("%s%s", value, "%")
+						} else if filters.Operator == "ENDSWITH" {
+							filters.Operator = "LIKE"
+							filters.Value = fmt.Sprintf("%s%s", "%", value)
+						} else if filters.Operator == "ELIKE" {
+							filters.Operator = "LIKE"
+							filters.Value = i
+						} else {
+							filters.Value = fmt.Sprintf("%s%s%s", "%", value, "%")
+						}
 					default:
 						filters.Value = i
 					}
