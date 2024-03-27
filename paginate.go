@@ -305,12 +305,12 @@ func createFilters(filterParams interface{}, p *pageRequest) {
 	f, ok := filterParams.([]interface{})
 	s, ok2 := filterParams.(string)
 	if ok {
-		p.Filters = arrayToFilter(f, p.Config)
+		p.Filters = ArrayToFilter(f, p.Config)
 		p.Filters.Fields = p.Fields
 	} else if ok2 {
 		iface := []interface{}{}
 		if e := p.Config.JSONUnmarshal([]byte(s), &iface); nil == e && len(iface) > 0 {
-			p.Filters = arrayToFilter(iface, p.Config)
+			p.Filters = ArrayToFilter(iface, p.Config)
 		}
 		p.Filters.Fields = p.Fields
 	}
@@ -514,7 +514,7 @@ func generateParams(param *parameter, config Config, getValue func(string) strin
 	param.Fields = findValue(config.FieldsParams, "fields")
 }
 
-func arrayToFilter(arr []interface{}, config Config) pageFilters {
+func ArrayToFilter(arr []interface{}, config Config) pageFilters {
 	filters := pageFilters{
 		Single: false,
 	}
@@ -527,7 +527,7 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 		for k, i := range arr {
 			iface, ok := i.([]interface{})
 			if ok && !filters.Single {
-				subFilters = append(subFilters, arrayToFilter(iface, config))
+				subFilters = append(subFilters, ArrayToFilter(iface, config))
 			} else if arrayLen == 1 {
 				operator, ok := i.(string)
 				if ok {
