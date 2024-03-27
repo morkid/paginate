@@ -59,7 +59,7 @@ func TestGetNetHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -114,7 +114,7 @@ func TestGetFastHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -182,7 +182,7 @@ func TestPostNetHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -246,7 +246,7 @@ func TestPostFastHttp(t *testing.T) {
 		}
 	}
 
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "user.average_point" {
 			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
@@ -287,7 +287,7 @@ func TestStartsWithStringFilter(t *testing.T) {
 	req.SetBodyString(query)
 
 	parsed := parseRequest(req, Config{})
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "username" {
 			t.Errorf(format, "Filter field for username", "username", filters[0].Column)
@@ -328,7 +328,7 @@ func TestEndsWithStringFilter(t *testing.T) {
 	req.SetBodyString(query)
 
 	parsed := parseRequest(req, Config{})
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "username" {
 			t.Errorf(format, "Filter field for username", "username", filters[0].Column)
@@ -369,7 +369,7 @@ func TestExactStringFilter(t *testing.T) {
 	req.SetBodyString(query)
 
 	parsed := parseRequest(req, Config{})
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "username" {
 			t.Errorf(format, "Filter field for username", "username", filters[0].Column)
@@ -410,7 +410,7 @@ func TestContainsStringFilter(t *testing.T) {
 	req.SetBodyString(query)
 
 	parsed := parseRequest(req, Config{})
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "username" {
 			t.Errorf(format, "Filter field for username", "username", filters[0].Column)
@@ -451,7 +451,7 @@ func TestNotLikeStringFilter(t *testing.T) {
 	req.SetBodyString(query)
 
 	parsed := parseRequest(req, Config{})
-	filters, ok := parsed.Filters.Value.([]pageFilters)
+	filters, ok := parsed.Filters.Value.([]PageFilters)
 	if ok {
 		if filters[0].Column != "username" {
 			t.Errorf(format, "Filter field for username", "username", filters[0].Column)

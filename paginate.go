@@ -514,8 +514,8 @@ func generateParams(param *parameter, config Config, getValue func(string) strin
 	param.Fields = findValue(config.FieldsParams, "fields")
 }
 
-func ArrayToFilter(arr []interface{}, config Config) pageFilters {
-	filters := pageFilters{
+func ArrayToFilter(arr []interface{}, config Config) PageFilters {
+	filters := PageFilters{
 		Single: false,
 	}
 
@@ -523,7 +523,7 @@ func ArrayToFilter(arr []interface{}, config Config) pageFilters {
 	arrayLen := len(arr)
 
 	if len(arr) > 0 {
-		subFilters := []pageFilters{}
+		subFilters := []PageFilters{}
 		for k, i := range arr {
 			iface, ok := i.([]interface{})
 			if ok && !filters.Single {
@@ -609,7 +609,7 @@ func ArrayToFilter(arr []interface{}, config Config) pageFilters {
 			}
 		}
 		if len(subFilters) > 0 {
-			separatedSubFilters := []pageFilters{}
+			separatedSubFilters := []PageFilters{}
 			hasOperator := false
 			defaultOperator := config.Operator
 			if defaultOperator == "" {
@@ -620,7 +620,7 @@ func ArrayToFilter(arr []interface{}, config Config) pageFilters {
 					break
 				}
 				if !hasOperator && !s.IsOperator && k > 0 {
-					separatedSubFilters = append(separatedSubFilters, pageFilters{
+					separatedSubFilters = append(separatedSubFilters, PageFilters{
 						Operator:   defaultOperator,
 						IsOperator: true,
 						Single:     true,
@@ -638,18 +638,18 @@ func ArrayToFilter(arr []interface{}, config Config) pageFilters {
 }
 
 //gocyclo:ignore
-func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{}) {
+func generateWhereCauses(f PageFilters, config Config) ([]string, []interface{}) {
 	wheres := []string{}
 	params := []interface{}{}
 
 	if !f.Single && !f.IsOperator {
-		ifaces, ok := f.Value.([]pageFilters)
+		ifaces, ok := f.Value.([]PageFilters)
 		if ok && len(ifaces) > 0 {
 			wheres = append(wheres, "(")
 			hasOpen := false
 			for _, i := range ifaces {
-				subs, isSub := i.Value.([]pageFilters)
-				regular, isNotSub := i.Value.(pageFilters)
+				subs, isSub := i.Value.([]PageFilters)
+				regular, isNotSub := i.Value.(PageFilters)
 				if isSub && len(subs) > 0 {
 					wheres = append(wheres, "(")
 					for _, s := range subs {
@@ -813,8 +813,8 @@ type Config struct {
 	ErrorEnabled         bool
 }
 
-// pageFilters struct
-type pageFilters struct {
+// PageFilters struct
+type PageFilters struct {
 	Column      string
 	Operator    string
 	Value       interface{}
@@ -866,7 +866,7 @@ type pageRequest struct {
 	Size    int
 	Page    int
 	Sorts   []sortOrder
-	Filters pageFilters
+	Filters PageFilters
 	Config  Config `json:"-"`
 	Fields  []string
 }
