@@ -235,7 +235,7 @@ func (r resContext) Response(res interface{}) Page {
 	page.TotalPages = int64(f)
 	page.Page = int64(pr.Page)
 	page.Size = int64(pr.Size)
-	page.MaxPage = 0
+	page.MaxPage = 1
 	page.Visible = rs.RowsAffected
 	if page.TotalPages > 0 {
 		page.MaxPage = page.TotalPages
@@ -248,7 +248,7 @@ func (r resContext) Response(res interface{}) Page {
 		page.MaxPage = 0
 		page.TotalPages = 0
 	}
-	page.First = causes.Offset == 1
+	page.First = causes.Offset < 1
 	page.Last = page.Page == page.TotalPages
 
 	if hasAdapter && cKey != "" {
@@ -445,7 +445,11 @@ func parsingQueryString(param *parameter, p *pageRequest) {
 	}
 
 	if i, e := strconv.Atoi(param.Page); nil == e {
-		p.Page = i
+		if i == 0 {
+			p.Page = 1
+		} else {
+			p.Page = i
+		}
 	} else {
 		p.Page = 1
 	}
