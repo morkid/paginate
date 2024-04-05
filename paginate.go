@@ -238,9 +238,9 @@ func (r resContext) Response(res interface{}) Page {
 	page.MaxPage = 0
 	page.Visible = rs.RowsAffected
 	if page.TotalPages > 0 {
-		page.MaxPage = page.TotalPages - 1
+		page.MaxPage = page.TotalPages
 	}
-	if page.TotalPages < 1 {
+	if page.TotalPages == 0 {
 		page.TotalPages = 1
 	}
 
@@ -248,8 +248,8 @@ func (r resContext) Response(res interface{}) Page {
 		page.MaxPage = 0
 		page.TotalPages = 0
 	}
-	page.First = causes.Offset < 1
-	page.Last = page.MaxPage == page.Page
+	page.First = causes.Offset == 1
+	page.Last = page.Page == page.TotalPages
 
 	if hasAdapter && cKey != "" {
 		if cache, err := p.Config.JSONMarshal(page); nil == err {
@@ -331,7 +331,7 @@ func createCauses(p pageRequest) requestQuery {
 	}
 
 	query.Limit = p.Size
-	query.Offset = p.Page * p.Size
+	query.Offset = (p.Page - 1) * p.Size
 	query.Wheres = wheres
 	query.WhereString = strings.Join(wheres, " ")
 	query.Sorts = sorts
@@ -447,7 +447,7 @@ func parsingQueryString(param *parameter, p *pageRequest) {
 	if i, e := strconv.Atoi(param.Page); nil == e {
 		p.Page = i
 	} else {
-		p.Page = 0
+		p.Page = 1
 	}
 
 	if param.Sort != "" {
