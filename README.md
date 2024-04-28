@@ -111,8 +111,8 @@ see more about [customize default configuration](#customize-default-configuratio
     // has reached the end of the page
     "last": bool,
 
-    // Fist Page is true if the page is 0
-    "fist": bool,
+    // First Page is true if the page is 0
+    "first": bool,
 
     // Visible
     // total visible items
