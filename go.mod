@@ -1,4 +1,4 @@
-module github.com/hoaaah/paginate
+module github.com/morkid/paginate
 
 go 1.15
 
