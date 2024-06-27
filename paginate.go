@@ -37,14 +37,6 @@ type Pagination struct {
 	Config *Config
 }
 
-// Response return page of results
-//
-// Deprecated: Response must not be used. Use With instead
-func (p *Pagination) Response(stmt *gorm.DB, req interface{}, res interface{}) Page {
-	fmt.Println("paginate.Response(stmt, req, res) is deprecated! please use paginate.With(stmt).Request(req).Response(res) instead")
-	return p.With(stmt).Request(req).Response(res)
-}
-
 // With func
 func (p *Pagination) With(stmt *gorm.DB) RequestContext {
 	return reqContext{
@@ -116,14 +108,27 @@ func (r resContext) Response(res interface{}) Page {
 	if p.Config.DefaultSize == 0 {
 		p.Config.DefaultSize = 10
 	}
+	if p.Config.PageStart < 0 {
+		p.Config.PageStart = 0
+	}
 
-	if p.Config.FieldWrapper == "" && p.Config.ValueWrapper == "" {
-		defaultWrapper := "LOWER(%s)"
-		wrappers := map[string]string{
+	defaultWrapper := "LOWER(%s)"
+	wrappers := map[string]string{
+		"sqlite":   defaultWrapper,
+		"mysql":    defaultWrapper,
+		"postgres": "LOWER((%s)::text)",
+	}
+
+	if p.Config.LikeAsIlikeDisabled {
+		defaultWrapper := "%s"
+		wrappers = map[string]string{
 			"sqlite":   defaultWrapper,
 			"mysql":    defaultWrapper,
-			"postgres": "LOWER((%s)::text)",
+			"postgres": "(%s)::text",
 		}
+	}
+
+	if p.Config.FieldWrapper == "" && p.Config.ValueWrapper == "" {
 		p.Config.FieldWrapper = defaultWrapper
 		if wrapper, ok := wrappers[query.Dialector.Name()]; ok {
 			p.Config.FieldWrapper = wrapper
@@ -232,24 +237,20 @@ func (r resContext) Response(res interface{}) Page {
 	if math.Mod(f, 1.0) > 0 {
 		f = f + 1
 	}
+	f = math.Max(f, 1)
+
 	page.TotalPages = int64(f)
+	page.MaxPage = page.TotalPages - 1 + p.Config.PageStart
 	page.Page = int64(pr.Page)
 	page.Size = int64(pr.Size)
-	page.MaxPage = 0
 	page.Visible = rs.RowsAffected
-	if page.TotalPages > 0 {
-		page.MaxPage = page.TotalPages - 1
-	}
-	if page.TotalPages < 1 {
-		page.TotalPages = 1
-	}
 
 	if page.Total < 1 {
-		page.MaxPage = 0
+		page.MaxPage = p.Config.PageStart
 		page.TotalPages = 0
 	}
 	page.First = causes.Offset < 1
-	page.Last = page.MaxPage == page.Page
+	page.Last = page.Page >= page.MaxPage
 
 	if hasAdapter && cKey != "" {
 		if cache, err := p.Config.JSONMarshal(page); nil == err {
@@ -331,7 +332,7 @@ func createCauses(p pageRequest) requestQuery {
 	}
 
 	query.Limit = p.Size
-	query.Offset = p.Page * p.Size
+	query.Offset = (p.Page - int(p.Config.PageStart)) * p.Size
 	query.Wheres = wheres
 	query.WhereString = strings.Join(wheres, " ")
 	query.Sorts = sorts
@@ -363,7 +364,10 @@ func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
 			var postData map[string]string
 			if err := p.Config.JSONUnmarshal(body, &postData); nil == err {
 				generateParams(param, p.Config, func(key string) string {
-					value, _ := postData[key]
+					value, exists := postData[key]
+					if !exists {
+						value = ""
+					}
 					return value
 				})
 			} else {
@@ -405,7 +409,10 @@ func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
 			var postData map[string]string
 			if err := p.Config.JSONUnmarshal(b, &postData); nil == err {
 				generateParams(param, p.Config, func(key string) string {
-					value, _ := postData[key]
+					value, exists := postData[key]
+					if !exists {
+						value = ""
+					}
 					return value
 				})
 			} else {
@@ -447,7 +454,7 @@ func parsingQueryString(param *parameter, p *pageRequest) {
 	if i, e := strconv.Atoi(param.Page); nil == e {
 		p.Page = i
 	} else {
-		p.Page = 0
+		p.Page = int(p.Config.PageStart)
 	}
 
 	if param.Sort != "" {
@@ -521,6 +528,10 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 
 	operatorEscape := regexp.MustCompile(`[^A-z=\<\>\-\+\^/\*%&! ]+`)
 	arrayLen := len(arr)
+	defaultOperator := config.Operator
+	if defaultOperator == "" {
+		defaultOperator = "OR"
+	}
 
 	if len(arr) > 0 {
 		subFilters := []pageFilters{}
@@ -545,8 +556,12 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 					}
 				} else if k == 1 {
 					filters.Value = i
-					if nil == i {
+					if nil == i || reflect.TypeOf(i).Name() == "bool" {
 						filters.Operator = "IS"
+					}
+					if strings.Contains(filters.Column, ",") {
+						subFilters = filterToSubFilter(&filters, i, config)
+						continue
 					}
 				}
 			} else if arrayLen == 3 {
@@ -562,6 +577,10 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 						filters.Single = true
 					}
 				} else if k == 2 {
+					if strings.Contains(filters.Column, ",") {
+						subFilters = filterToSubFilter(&filters, i, config)
+						continue
+					}
 					switch filters.Operator {
 					case "LIKE", "ILIKE", "NOT LIKE", "NOT ILIKE":
 						escapeString := ""
@@ -579,11 +598,10 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 						}
 						value := fmt.Sprintf("%v", i)
 						re := regexp.MustCompile(escapePattern)
-						value = string(re.ReplaceAll([]byte(value), []byte(escapeString+`$1`)))
-						if config.SmartSearch {
+						value = re.ReplaceAllString(value, escapeString+`$1`)
+						if config.SmartSearchEnabled {
 							re := regexp.MustCompile(`[\s]+`)
-							byt := re.ReplaceAll([]byte(value), []byte("%"))
-							value = string(byt)
+							value = re.ReplaceAllString(value, "%")
 						}
 						filters.Value = fmt.Sprintf("%s%s%s", "%", value, "%")
 					default:
@@ -595,10 +613,6 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 		if len(subFilters) > 0 {
 			separatedSubFilters := []pageFilters{}
 			hasOperator := false
-			defaultOperator := config.Operator
-			if defaultOperator == "" {
-				defaultOperator = "OR"
-			}
 			for k, s := range subFilters {
 				if s.IsOperator && len(subFilters) == (k+1) {
 					break
@@ -615,10 +629,30 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 			}
 			filters.Value = separatedSubFilters
 			filters.Single = false
+			filters.IsOperator = false
 		}
 	}
 
 	return filters
+}
+
+func filterToSubFilter(filters *pageFilters, value interface{}, config Config) []pageFilters {
+	subFilters := []pageFilters{}
+	re := regexp.MustCompile(`[^A-z0-9\._,]+`)
+	colString := re.ReplaceAllString(filters.Column, "")
+	columns := strings.Split(colString, ",")
+	columnRepeat := []interface{}{}
+	for _, col := range columns {
+		columnRepeat = append(columnRepeat, []interface{}{col, filters.Operator, value})
+	}
+
+	filters.Column = ""
+	filters.Single = false
+	filters.Operator = ""
+	filters.IsOperator = false
+	subFilters = append(subFilters, arrayToFilter(columnRepeat, config))
+
+	return subFilters
 }
 
 //gocyclo:ignore
@@ -703,7 +737,7 @@ func generateWhereCauses(f pageFilters, config Config) ([]string, []interface{})
 				if isStrValue {
 					if config.ValueWrapper != "" {
 						value = fmt.Sprintf(config.ValueWrapper, value)
-					} else {
+					} else if !config.LikeAsIlikeDisabled {
 						value = strings.ToLower(value)
 					}
 					params = append(params, value)
@@ -781,7 +815,9 @@ type Config struct {
 	FieldWrapper         string
 	ValueWrapper         string
 	DefaultSize          int64
-	SmartSearch          bool
+	PageStart            int64
+	LikeAsIlikeDisabled  bool
+	SmartSearchEnabled   bool
 	Statement            *gorm.Statement `json:"-"`
 	CustomParamEnabled   bool
 	SortParams           []string

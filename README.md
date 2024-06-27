@@ -52,11 +52,9 @@ var req *http.Request = ...
 // or
 // var req *fasthttp.Request
 
-model := db.Where("id > ?", 1).Model(&Article{})
+stmt := db.Where("id > ?", 1).Model(&Article{})
 pg := paginate.New()
-page := pg.Response(model, req, &[]Article{})
-// or 
-page := pg.With(model).Request(req).Response(&[]Article{})
+page := pg.With(stmt).Request(req).Response(&[]Article{})
 
 log.Println(page.Total)
 log.Println(page.Items)
@@ -71,10 +69,6 @@ pg := paginate.New(&paginate.Config{
 })
 ```
 see more about [customize default configuration](#customize-default-configuration).
-
-> Note that `Response` was marked as a deprecated function. Please use `With` instead.  
-> Old: `pg.Response(model, req, &[]Article{})`,  
-> New: `pg.With(model).Request(req).Response(&[]Article{})`
 
 ## Pagination Result
 
@@ -227,9 +221,9 @@ func main() {
     pg := paginate.New()
 
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        model := db.Joins("User").Model(&Article{})
-        paginated := pg.Response(model, r, &[]Article{})
-        j, _ := json.Marshal(paginated)
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(r).Response(&[]Article{})
+        j, _ := json.Marshal(page)
         w.Header().Set("Content-type", "application/json")
         w.Write(j)
     })
@@ -253,9 +247,9 @@ func main() {
     pg := paginate.New()
 
     fasthttp.ListenAndServe(":3000", func(ctx *fasthttp.RequestCtx) {
-        model := db.Joins("User").Model(&Article{})
-        paginated := pg.Response(model, &ctx.Request, &[]Article{})
-        j, _ := json.Marshal(paginated)
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(&ctx.Request).Response(&[]Article{})
+        j, _ := json.Marshal(page)
         ctx.SetContentType("application/json")
         ctx.SetBody(j)
     })
@@ -276,9 +270,9 @@ func main() {
     pg := paginate.New()
     app := mux.NewRouter()
     app.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-        model := db.Joins("User").Model(&Article{})
-        paginated := pg.Response(model, req, &[]Article{})
-        j, _ := json.Marshal(paginated)
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(req).Response(&[]Article{})
+        j, _ := json.Marshal(page)
         w.Header().Set("Content-type", "application/json")
         w.Write(j)
     }).Methods("GET")
@@ -302,8 +296,9 @@ func main() {
     pg := paginate.New()
     app := fiber.New()
     app.Get("/", func(c *fiber.Ctx) error {
-        model := db.Joins("User").Model(&Article{})
-        return c.JSON(pg.Response(model, c.Request(), &[]Article{}))
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(c.Request()).Response(&[]Article{})
+        return c.JSON(page)
     })
 
     app.Listen(":3000")
@@ -325,8 +320,9 @@ func main() {
     pg := paginate.New()
     app := echo.New()
     app.GET("/", func(c echo.Context) error {
-        model := db.Joins("User").Model(&Article{})
-        return c.JSON(200, pg.Response(model, c.Request(), &[]Article{}))
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(c.Request()).Response(&[]Article{})
+        return c.JSON(200, page)
     })
 
     app.Logger.Fatal(app.Start(":3000"))
@@ -348,8 +344,9 @@ func main() {
     pg := paginate.New()
     app := gin.Default()
     app.GET("/", func(c *gin.Context) {
-        model := db.Joins("User").Model(&Article{})
-        c.JSON(200, pg.Response(model, c.Request, &[]Article{}))
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(c.Request).Response(&[]Article{})
+        c.JSON(200, page)
     })
     app.Run(":3000")
 }
@@ -372,8 +369,9 @@ func main() {
     app := martini.Classic()
     app.Use(render.Renderer())
     app.Get("/", func(req *http.Request, r render.Render) {
-        model := db.Joins("User").Model(&Article{})
-        r.JSON(200, pg.Response(model, req, &[]Article{}))
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(req).Response(&[]Article{})
+        r.JSON(200, page)
     })
     app.Run()
 }
@@ -392,9 +390,9 @@ func main() {
     // var db *gorm.DB
     pg := paginate.New()
     web.Get("/", func(c *context.Context) {
-        model := db.Joins("User").Model(&Article{})
-        c.Output.JSON(
-            pg.Response(model, c.Request, &[]Article{}), false, false)
+        stmt := db.Joins("User").Model(&Article{})
+        page := pg.With(stmt).Request(c.Request).Response(&[]Article{})
+        c.Output.JSON(page, false, false)
     })
     web.Run(":3000")
 }
@@ -529,6 +527,7 @@ Single array member is known as **Logical Operator**.
 // WHERE age = 20 OR age = 25
 ```
 
+
 You are allowed to send array inside a value.  
 ```js
 ["age", "between", [20, 30] ]
@@ -538,6 +537,19 @@ You are allowed to send array inside a value.
 ["age", "not in", [20, 21, 22, 23, 24, 25, 26, 26] ]
 // Produces:
 // WHERE age NOT IN(20, 21, 22, 23, 24, 25, 26, 26)
+```
+
+Define chain columns with same value separated by comma.
+```js
+// Example 1
+["price,discount", ">", 10]
+// Produces:
+// WHERE price > 10 OR discount > 25
+
+// Example 2
+["deleted_at,expiration_date", null]
+// Produces:
+// WHERE deleted_at IS NULL OR expiration_date IS NULL
 ```
 
 You can filter nested condition with deep array.  
@@ -592,7 +604,9 @@ Config             | Type       | Default               | Description
 Operator           | `string`   | `OR`                  | Default conditional operator if no operator specified.<br>For example<br>`GET /user?filters=[["name","like","jo"],["age",">",20]]`,<br>produces<br>`SELECT * FROM user where name like '%jo' OR age > 20`
 FieldWrapper       | `string`   | `LOWER(%s)`           | FieldWrapper for `LIKE` operator *(for postgres default is: `LOWER((%s)::text)`)*
 DefaultSize        | `int64`    | `10`                  | Default size or limit per page
-SmartSearch        | `bool`     | `false`               | Enable smart search *(Experimental feature)*
+PageStart          | `int64`    | `0`                   | Set start page, default `0` if not set. `total_pages` , `max_page` and `page` variable will be affected if you set `PageStart` greater than `0` 
+LikeAsIlikeDisabled | `bool`    | `false`               | By default, paginate using Case Insensitive on `LIKE` operator. Instead of using `ILIKE`, you can use `LIKE` operator to find what you want. You can set `LikeAsIlikeDisabled` to `true` if you need this feature to be disabled.
+SmartSearchEnabled | `bool`     | `false`               | Enable smart search *(Experimental feature)*
 CustomParamEnabled | `bool`     | `false`               | Enable custom request parameter
 FieldSelectorEnabled | `bool`   | `false`               | Enable partial response with specific fields. Comma separated per field. eg: `?fields=title,user.name`
 SortParams         | `[]string` | `[]string{"sort"}`    | if `CustomParamEnabled` is `true`,<br>you can set the `SortParams` with custom parameter names.<br>For example: `[]string{"sorting", "ordering", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?sorting=-name`<br>or `?ordering=-name`<br>or `?other_alternative_param=-name`<br>or `?sort=-name`
@@ -620,15 +634,15 @@ override := func(article *Article) {
 }
 
 var articles []Article
-model := db.Joins("User").Model(&Article{})
+stmt := db.Joins("User").Model(&Article{})
 
 pg := paginate.New()
-result := pg.Response(model, httpRequest, &articles)
+page := pg.With(stmt).Request(httpRequest).Response(&articles)
 for index := range articles {
     override(&articles[index])
 }
 
-log.Println(result.Items)
+log.Println(page.Items)
 
 ```
 
@@ -656,9 +670,9 @@ type UserNullable {
 ```go
 // usage
 nameAndIDOnly := []string{"name","id"}
-model := db.Model(&User{})
+stmt := db.Model(&User{})
 
-page := pg.With(model).
+page := pg.With(stmt).
    Request(req).
    Fields(nameAndIDOnly).
    Response([]&UserNullable{})
@@ -706,7 +720,7 @@ func main() {
         CacheAdapter: gocache.NewInMemoryCache(adapterConfig),
     })
 
-    page := pg.With(model).
+    page := pg.With(stmt).
                Request(req).
                Cache("article"). // set cache name
                Response(&[]Article{})
@@ -731,7 +745,7 @@ func main() {
         CacheAdapter: gocache.NewDiskCache(adapterConfig),
     })
 
-    page := pg.With(model).
+    page := pg.With(stmt).
                Request(req).
                Cache("article"). // set cache name
                Response(&[]Article{})
@@ -763,7 +777,7 @@ func main() {
         CacheAdapter: cache.NewRedisCache(adapterConfig),
     })
 
-    page := pg.With(model).
+    page := pg.With(stmt).
                Request(req).
                Cache("article").
                Response(&[]Article{})
@@ -801,7 +815,7 @@ func main() {
         CacheAdapter: cache.NewElasticCache(adapterConfig),
     })
 
-    page := pg.With(model).
+    page := pg.With(stmt).
                Request(req).
                Cache("article").
                Response(&[]Article{})

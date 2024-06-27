@@ -8,7 +8,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/morkid/gocache"
 	"github.com/valyala/fasthttp"
@@ -286,12 +289,25 @@ func TestPaginate(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Discard,
 	})
+	db.Exec("PRAGMA case_sensitive_like=ON;")
 	db.AutoMigrate(&User{}, &Article{})
 
 	users := []User{{Name: "John doe", AveragePoint: "Seventy %"}, {Name: "Jane doe", AveragePoint: "one hundred %"}}
 	articles := []Article{}
-	articles = append(articles, Article{Title: "Written by john", Content: "Example by john", User: users[0]})
-	articles = append(articles, Article{Title: "Written by jane", Content: "Example by jane", User: users[1]})
+
+	// add massive data
+	for i := 0; i < 50; i++ {
+		articles = append(articles, Article{
+			Title:   fmt.Sprintf("Written by john %d", i),
+			Content: fmt.Sprintf("Example by john %d", i),
+			UserID:  1,
+		})
+		articles = append(articles, Article{
+			Title:   fmt.Sprintf("Written by jane %d", i),
+			Content: fmt.Sprintf("Example by jane %d", i),
+			UserID:  2,
+		})
+	}
 
 	if nil != err {
 		t.Error(err.Error())
@@ -314,13 +330,16 @@ func TestPaginate(t *testing.T) {
 		return
 	}
 
+	// wait for transaction to finish
+	time.Sleep(1 * time.Second)
+
 	size := 1
 	page := 0
 	sort := "user.name,-id"
 	avg := "y %"
-	data := "page=%d&size=%d&sort=%s&filters=%s"
+	data := "page=%v&size=%d&sort=%s&filters=%s"
 
-	queryFilter := fmt.Sprintf(`[["user.average_point","like","%s"],["AND"],["user.name","IS NOT",null],["id","like","1"]]`, avg)
+	queryFilter := fmt.Sprintf(`[["user.average_point","like","%s"],["AND"],["user.name","IS NOT",null]]`, avg)
 	query := fmt.Sprintf(data, page, size, sort, url.QueryEscape(queryFilter))
 
 	request := &http.Request{
@@ -331,13 +350,17 @@ func TestPaginate(t *testing.T) {
 	}
 	response := []Article{}
 
-	model := db.Joins("User").Model(&Article{})
-	result := New().With(model).Request(request).Response(&response)
+	stmt := db.Joins("User").Model(&Article{})
+	result := New(&Config{LikeAsIlikeDisabled: true}).With(stmt).Request(request).Response(&response)
 
 	_, err = json.MarshalIndent(result, "", "  ")
-	if nil != err {
-		t.Error(err)
-	}
+	expectNil(t, err)
+	expect(t, result.Page, int64(0), "Invalid page")
+	expect(t, result.Total, int64(50), "Invalid total result")
+	expect(t, result.TotalPages, int64(50), "Invalid total pages")
+	expect(t, result.MaxPage, int64(49), "Invalid max page")
+	expectTrue(t, result.First, "Invalid first page")
+	expectFalse(t, result.Last, "Invalid last page")
 
 	queryFilter = fmt.Sprintf(`[["users.average_point","like","%s"],["AND"],["user.name","IS NOT",null],["id","like","1"]]`, avg)
 	query = fmt.Sprintf(data, page, size, sort, url.QueryEscape(queryFilter))
@@ -350,11 +373,51 @@ func TestPaginate(t *testing.T) {
 	}
 	response = []Article{}
 
-	model = db.Joins("User").Model(&Article{})
-	result = New(&Config{ErrorEnabled: true}).With(model).Request(request).Response(&response)
-	if !result.Error {
-		t.Error("Failed to get error message")
+	stmt = db.Joins("User").Model(&Article{})
+	result = New(&Config{ErrorEnabled: true}).With(stmt).Request(request).Response(&response)
+	expectTrue(t, result.Error, "Failed to get error message")
+
+	page = 1
+	size = 100
+	pageStart := int64(1)
+	query = fmt.Sprintf(data, page, size, sort, "")
+
+	request = &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			RawQuery: query,
+		},
 	}
+	response = []Article{}
+
+	stmt = db.Joins("User").Model(&Article{})
+	result = New(&Config{PageStart: pageStart}).With(stmt).Request(request).Response(&response)
+	expect(t, result.Page, int64(1), "Invalid page start")
+	expect(t, result.MaxPage, int64(1), "Invalid max page")
+	expect(t, len(response), 100, "Invalid total items")
+	expect(t, result.Total, int64(100), "Invalid total result")
+	expect(t, result.TotalPages, int64(1), "Invalid total pages")
+	expectTrue(t, result.First, "Invalid value first")
+	expectTrue(t, result.Last, "Invalid value last")
+
+	queryFilter = `[["user.average_point","like","y %"],["AND"],["user.name,title","LIKE","john"]]`
+	query = fmt.Sprintf(data, page, size, sort, url.QueryEscape(queryFilter))
+
+	request = &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			RawQuery: query,
+		},
+	}
+	response = []Article{}
+
+	stmt = db.Joins("User").Model(&Article{})
+	result = New(&Config{Operator: "AND", PageStart: pageStart, ErrorEnabled: true}).
+		With(stmt).Request(request).Response(&response)
+	expectFalse(t, result.Error, "An error occurred")
+	expect(t, result.Page, int64(1), "Invalid page start")
+	expect(t, result.MaxPage, int64(1), "Invalid max page")
+	expect(t, result.Total, int64(50), "Invalid max page")
 }
 
 type noOpAdapter struct {
@@ -461,8 +524,8 @@ func TestCache(t *testing.T) {
 	}
 	pg := New(config)
 	// set cache
-	model1 := db.Joins("User").Model(&Article{}).Preload(`Category`)
-	page1 := pg.With(model1).
+	stmt1 := db.Joins("User").Model(&Article{}).Preload(`Category`)
+	page1 := pg.With(stmt1).
 		Request(request).
 		Fields([]string{"id"}).
 		Cache("cache_prefix").
@@ -470,8 +533,8 @@ func TestCache(t *testing.T) {
 
 	// get cache
 	var cached []Article
-	model2 := db.Joins("User").Model(&Article{})
-	page2 := pg.With(model2).Request(request).Cache("cache_prefix").Response(&cached)
+	stmt2 := db.Joins("User").Model(&Article{})
+	page2 := pg.With(stmt2).Request(request).Cache("cache_prefix").Response(&cached)
 
 	if len(cached) < 1 {
 		t.Error("Cache pointer not working perfectly")
@@ -485,4 +548,87 @@ func TestCache(t *testing.T) {
 	pg.ClearCache("cache", "cache_")
 	pg.ClearAllCache()
 	pg.ClearAllCache()
+}
+
+func expect(t *testing.T, expected interface{}, actual interface{}, message ...string) {
+	if expected != actual {
+		t.Errorf("%s: Expected %s(%v), got %s(%v)",
+			strings.Join(message, " "),
+			reflect.TypeOf(expected), expected,
+			reflect.TypeOf(actual), actual)
+		t.Fail()
+	}
+}
+
+func expectFalse(t *testing.T, actual bool, message ...string) {
+	expect(t, false, actual, message...)
+}
+
+func expectTrue(t *testing.T, actual bool, message ...string) {
+	expect(t, true, actual, message...)
+}
+
+func expectNil(t *testing.T, actual interface{}, message ...string) {
+	expect(t, nil, actual, message...)
+}
+
+func expectNotNil(t *testing.T, actual interface{}, message ...string) {
+	expect(t, false, actual == nil, message...)
+}
+
+func TestArrayFilter(t *testing.T) {
+	jsonString := `[
+		["name,email,address", "like", "abc"]
+	]`
+	var jsonData []interface{}
+	json.Unmarshal([]byte(jsonString), &jsonData)
+	filters := arrayToFilter(jsonData, Config{})
+
+	expectNotNil(t, filters)
+	expectNotNil(t, filters.Value)
+
+	subFilters, ok := filters.Value.([]pageFilters)
+	expectTrue(t, ok)
+	expect(t, 1, len(subFilters))
+
+	subFilterValues, ok := subFilters[0].Value.([]pageFilters)
+	expectTrue(t, ok)
+	expect(t, 1, len(subFilterValues))
+
+	contents, ok := subFilterValues[0].Value.([]pageFilters)
+	expectTrue(t, ok)
+	expect(t, 5, len(contents))
+
+	expect(t, "name", contents[0].Column)
+	expect(t, "LIKE", contents[0].Operator)
+	expect(t, "%abc%", contents[0].Value)
+
+	expect(t, "OR", contents[1].Operator)
+
+	expect(t, "email", contents[2].Column)
+	expect(t, "LIKE", contents[2].Operator)
+	expect(t, "%abc%", contents[2].Value)
+
+	expect(t, "OR", contents[3].Operator)
+
+	expect(t, "address", contents[4].Column)
+	expect(t, "LIKE", contents[4].Operator)
+	expect(t, "%abc%", contents[4].Value)
+}
+
+func TestGenerateWhereCauses(t *testing.T) {
+	jsonString := `[
+		["name,email,address", "like", "abc"],
+		["id", ">", 1]
+	]`
+	var jsonData []interface{}
+	json.Unmarshal([]byte(jsonString), &jsonData)
+	filters := arrayToFilter(jsonData, Config{})
+	wheres, params := generateWhereCauses(filters, Config{})
+
+	where := strings.Join(wheres, " ")
+	where = strings.ReplaceAll(where, "( ", "(")
+	where = strings.ReplaceAll(where, " )", ")")
+	expect(t, "((((name LIKE ? OR email LIKE ? OR address LIKE ?))) OR (id > ?))", where)
+	expect(t, 4, len(params))
 }
