@@ -5,7 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/morkid/paginate)](https://goreportcard.com/report/github.com/morkid/paginate)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/morkid/paginate)](https://github.com/morkid/paginate/releases)
 
-Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginate** is compatible with [net/http](https://golang.org/pkg/net/http/) and [fasthttp](https://github.com/valyala/fasthttp). This library also supports many frameworks are based on net/http or fasthttp.
+Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginate** is compatible with [net/http](https://golang.org/pkg/net/http/) and [fasthttp](https://github.com/valyala/fasthttp). This library also supports many net/http or fasthttp based frameworks.
 
 ## Table Of Contents
 - [Installation](#installation)
