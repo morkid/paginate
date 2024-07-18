@@ -114,12 +114,12 @@ see more about [customize default configuration](#customize-default-configuratio
 
     // Error
     // true if an error has occurred and
-    // paginage.Config.ErrorEnabled is true
+    // paginate.Config.ErrorEnabled is true
     "error": bool,
 
     // Error Message
     // current error if available and
-    // paginage.Config.ErrorEnabled is true
+    // paginate.Config.ErrorEnabled is true
     "error_message": string,
 }
 ```
