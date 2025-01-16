@@ -23,6 +23,7 @@ Simple way to paginate [Gorm](https://github.com/go-gorm/gorm) result. **paginat
   - [Beego](#beego-example)
   - [jQuery DataTable Integration](#jquery-datatable-integration)
   - [jQuery Select2 Integration](#jquery-select2-integration)
+  - [Programmatically Pagination](#programmatically-pagination)
 - [Filter format](#filter-format)
 - [Customize default configuration](#customize-default-configuration)
 - [Override results](#override-results)
@@ -200,9 +201,10 @@ example paging, sorting and filtering:
    ```bash
    curl -X POST \
    -H 'Content-type: application/json' \
-   -d '{"page":"1","size":"20","sort":"-name","filters":["name","john"]}' \
+   -d '{"page":1,"size":20,"sort":"-name","filters":["name","john"]}' \
    http://localhost:3000/
    ```  
+10. You can bypass HTTP Request with [Custom Request](#programmatically-pagination).
 
 ## Example usage
 
@@ -497,6 +499,42 @@ $('#mySelect').select2({
         },
     }
 })
+```
+
+### Programmatically Pagination
+
+```go
+package main
+
+import (
+    "github.com/morkid/paginate"
+    ...
+)
+
+func main() {
+    // var db *gorm.DB
+    pg := paginate.New()
+    req := &paginate.Request{
+        Page: 2,
+        Size: 20,
+        Sort: "-publish_date",
+        filters: []interface{}{
+            []interface{}{"user.name", "like", "john"},
+            []interface{}{"and"},
+            []interface{}{"publish_date", ">=", "2025-12-31"},
+            []interface{}{"and"},
+            []interface{}{"user.active", "=", true},
+            []interface{}{"and"},
+            []interface{}{"user.last_login", "is not", nil},
+        }
+    }
+
+    stmt := db.Joins("User").Model(&Article{})
+    page := pg.With(stmt).
+        Request(req).
+        Response(&[]Article{})
+
+}
 ```
 
 

@@ -23,8 +23,8 @@ import (
 var format = "%s doesn't match. Expected: %v, Result: %v"
 
 func TestGetNetHttp(t *testing.T) {
-	size := 20
-	page := 1
+	size := int64(20)
+	page := int64(1)
 	sort := "user.name,-id"
 	avg := "seventy %"
 
@@ -81,8 +81,8 @@ func TestGetNetHttp(t *testing.T) {
 	}
 }
 func TestGetFastHttp(t *testing.T) {
-	size := 20
-	page := 1
+	size := int64(20)
+	page := int64(1)
 	sort := "user.name,-id"
 	avg := "seventy %"
 
@@ -137,15 +137,15 @@ func TestGetFastHttp(t *testing.T) {
 }
 
 func TestPostNetHttp(t *testing.T) {
-	size := 20
-	page := 1
+	size := int64(20)
+	page := int64(1)
 	sort := "user.name,-id"
 	avg := "seventy %"
 
 	data := `
 		{
-			"page": "%d",
-			"size": "%d",
+			"page": %d,
+			"size": %d,
 			"sort": "%s",
 			"filters": %s
 		}
@@ -204,15 +204,15 @@ func TestPostNetHttp(t *testing.T) {
 	}
 }
 func TestPostFastHttp(t *testing.T) {
-	size := 20
-	page := 1
+	size := int64(20)
+	page := int64(1)
 	sort := "user.name,-id"
 	avg := "seventy %"
 
 	data := `
 		{
-			"page": "%d",
-			"size": "%d",
+			"page": %d,
+			"size": %d,
 			"sort": "%s",
 			"filters": %s
 		}
@@ -265,6 +265,69 @@ func TestPostFastHttp(t *testing.T) {
 	} else {
 		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
 	}
+}
+
+func TestProgrammaticallyPaginate(t *testing.T) {
+	size := int64(20)
+	page := int64(1)
+	sort := "user.name,-id"
+	avg := "seventy %"
+
+	req := &Request{
+		Page: page,
+		Size: size,
+		Sort: sort,
+		Filters: []interface{}{
+			[]interface{}{"user.average_point", "like", avg},
+			[]interface{}{"and"},
+			[]interface{}{"user.average_point", "is not", nil},
+		},
+	}
+
+	parsed := parseRequest(req, Config{})
+	if parsed.Size != size {
+		t.Errorf(format, "Size", size, parsed.Size)
+	}
+	if parsed.Page != page {
+		t.Errorf(format, "Page", page, parsed.Page)
+	}
+	if len(parsed.Sorts) != 2 {
+		t.Errorf(format, "Sort length", 2, len(parsed.Sorts))
+	} else {
+		if parsed.Sorts[0].Column != "user.name" {
+			t.Errorf(format, "Sort field 0", "user.name", parsed.Sorts[0].Column)
+		}
+		if parsed.Sorts[0].Direction != "ASC" {
+			t.Errorf(format, "Sort direction 0", "ASC", parsed.Sorts[0].Direction)
+		}
+		if parsed.Sorts[1].Column != "id" {
+			t.Errorf(format, "Sort field 1", "id", parsed.Sorts[1].Column)
+		}
+		if parsed.Sorts[1].Direction != "DESC" {
+			t.Errorf(format, "Sort direction 1", "DESC", parsed.Sorts[1].Direction)
+		}
+	}
+
+	t.Log(parsed.Filters)
+
+	filters, ok := parsed.Filters.Value.([]pageFilters)
+	if ok {
+		if filters[0].Column != "user.average_point" {
+			t.Errorf(format, "Filter field for user.average_point", "user.average_point", filters[0].Column)
+		}
+		if filters[0].Operator != "LIKE" {
+			t.Errorf(format, "Filter operator for user.average_point", "LIKE", filters[0].Operator)
+		}
+		value, isValid := filters[0].Value.(string)
+		expected := "%" + avg + "%"
+		if !isValid || value != expected {
+			t.Errorf(format, "Filter operator for user.average_point", expected, value)
+		}
+	} else {
+		t.Log(parsed.Filters)
+		t.Errorf(format, "pageFilters class", "paginate.pageFilters", "null")
+	}
+
 }
 
 func TestPaginate(t *testing.T) {

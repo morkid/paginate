@@ -201,8 +201,8 @@ func (r resContext) Response(res interface{}) Page {
 	}
 
 	result = result.Count(&page.Total).
-		Limit(causes.Limit).
-		Offset(causes.Offset)
+		Limit(int(causes.Limit)).
+		Offset(int(causes.Offset))
 
 	page.RawError = result.Error
 
@@ -294,6 +294,10 @@ func parseRequest(r interface{}, config Config) pageRequest {
 		} else {
 			if fastHTTPp, isFastHTTPp := r.(*fasthttp.Request); isFastHTTPp {
 				parsingFastHTTPRequest(fastHTTPp, &pr)
+			} else {
+				if request, isRequest := r.(*Request); isRequest {
+					parsingQueryString(request, &pr)
+				}
 			}
 		}
 	}
@@ -332,7 +336,7 @@ func createCauses(p pageRequest) requestQuery {
 	}
 
 	query.Limit = p.Size
-	query.Offset = (p.Page - int(p.Config.PageStart)) * p.Size
+	query.Offset = (p.Page - p.Config.PageStart) * p.Size
 	query.Wheres = wheres
 	query.WhereString = strings.Join(wheres, " ")
 	query.Sorts = sorts
@@ -343,7 +347,7 @@ func createCauses(p pageRequest) requestQuery {
 
 // parsingNetHTTPRequest func
 func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
-	param := &parameter{}
+	param := &Request{}
 	if r.Method == "" {
 		r.Method = "GET"
 	}
@@ -354,7 +358,7 @@ func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
 		}
 		defer r.Body.Close()
 		if !p.Config.CustomParamEnabled {
-			var postData parameter
+			var postData Request
 			if err := p.Config.JSONUnmarshal(body, &postData); nil == err {
 				param = &postData
 			} else {
@@ -377,12 +381,12 @@ func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
 	} else if strings.ToUpper(r.Method) == "GET" {
 		query := r.URL.Query()
 		if !p.Config.CustomParamEnabled {
-			param.Size = query.Get("size")
-			param.Page = query.Get("page")
+			param.Size, _ = strconv.ParseInt(query.Get("size"), 10, 64)
+			param.Page, _ = strconv.ParseInt(query.Get("page"), 10, 64)
 			param.Sort = query.Get("sort")
 			param.Order = query.Get("order")
 			param.Filters = query.Get("filters")
-			param.Fields = query.Get("fields")
+			param.Fields = strings.Split(query.Get("fields"), ",")
 		} else {
 			generateParams(param, p.Config, func(key string) string {
 				return query.Get(key)
@@ -395,11 +399,11 @@ func parsingNetHTTPRequest(r *http.Request, p *pageRequest) {
 
 // parsingFastHTTPRequest func
 func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
-	param := &parameter{}
+	param := &Request{}
 	if r.Header.IsPost() {
 		b := r.Body()
 		if !p.Config.CustomParamEnabled {
-			var postData parameter
+			var postData Request
 			if err := p.Config.JSONUnmarshal(b, &postData); nil == err {
 				param = &postData
 			} else {
@@ -422,12 +426,12 @@ func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
 	} else if r.Header.IsGet() {
 		query := r.URI().QueryArgs()
 		if !p.Config.CustomParamEnabled {
-			param.Size = string(query.Peek("size"))
-			param.Page = string(query.Peek("page"))
+			param.Size, _ = strconv.ParseInt(string(query.Peek("size")), 10, 64)
+			param.Page, _ = strconv.ParseInt(string(query.Peek("page")), 10, 64)
 			param.Sort = string(query.Peek("sort"))
 			param.Order = string(query.Peek("order"))
 			param.Filters = string(query.Peek("filters"))
-			param.Fields = string(query.Peek("fields"))
+			param.Fields = strings.Split(string(query.Peek("fields")), ",")
 		} else {
 			generateParams(param, p.Config, func(key string) string {
 				return string(query.Peek(key))
@@ -438,23 +442,19 @@ func parsingFastHTTPRequest(r *fasthttp.Request, p *pageRequest) {
 	parsingQueryString(param, p)
 }
 
-func parsingQueryString(param *parameter, p *pageRequest) {
-	if i, e := strconv.Atoi(param.Size); nil == e {
-		p.Size = i
-	}
-
+func parsingQueryString(param *Request, p *pageRequest) {
+	p.Size = param.Size
 	if p.Size == 0 {
 		if p.Config.DefaultSize > 0 {
-			p.Size = int(p.Config.DefaultSize)
+			p.Size = p.Config.DefaultSize
 		} else {
 			p.Size = 10
 		}
 	}
 
-	if i, e := strconv.Atoi(param.Page); nil == e {
-		p.Page = i
-	} else {
-		p.Page = int(p.Config.PageStart)
+	p.Page = param.Page
+	if p.Page < p.Config.PageStart {
+		p.Page = p.Config.PageStart
 	}
 
 	if param.Sort != "" {
@@ -481,14 +481,12 @@ func parsingQueryString(param *parameter, p *pageRequest) {
 		}
 	}
 
-	if param.Fields != "" {
+	if len(param.Fields) > 0 {
 		re := regexp.MustCompile(`[^A-z0-9_\.,]+`)
-		if fields := strings.Split(param.Fields, ","); len(fields) > 0 {
-			for i := range fields {
-				fieldByte := re.ReplaceAll([]byte(fields[i]), []byte(""))
-				if field := string(fieldByte); field != "" {
-					p.Fields = append(p.Fields, field)
-				}
+		for _, field := range param.Fields {
+			fieldName := re.ReplaceAllString(field, "")
+			if fieldName != "" {
+				p.Fields = append(p.Fields, fieldName)
 			}
 		}
 	}
@@ -496,7 +494,7 @@ func parsingQueryString(param *parameter, p *pageRequest) {
 	createFilters(param.Filters, p)
 }
 
-func generateParams(param *parameter, config Config, getValue func(string) string) {
+func generateParams(param *Request, config Config, getValue func(string) string) {
 	findValue := func(keys []string, defaultKey string) string {
 		found := false
 		value := ""
@@ -514,11 +512,11 @@ func generateParams(param *parameter, config Config, getValue func(string) strin
 	}
 
 	param.Sort = findValue(config.SortParams, "sort")
-	param.Page = findValue(config.PageParams, "page")
-	param.Size = findValue(config.SizeParams, "size")
+	param.Page, _ = strconv.ParseInt(findValue(config.PageParams, "page"), 10, 64)
+	param.Size, _ = strconv.ParseInt(findValue(config.SizeParams, "size"), 10, 64)
 	param.Order = findValue(config.OrderParams, "order")
 	param.Filters = findValue(config.FilterParams, "filters")
-	param.Fields = findValue(config.FieldsParams, "fields")
+	param.Fields = strings.Split(findValue(config.FieldsParams, "fields"), ",")
 }
 
 func arrayToFilter(arr []interface{}, config Config) pageFilters {
@@ -556,7 +554,7 @@ func arrayToFilter(arr []interface{}, config Config) pageFilters {
 					}
 				} else if k == 1 {
 					filters.Value = i
-					if nil == i || reflect.TypeOf(i).Name() == "bool" {
+					if nil == i {
 						filters.Operator = "IS"
 					}
 					if strings.Contains(filters.Column, ",") {
@@ -861,13 +859,13 @@ type Page struct {
 	RawError     error       `json:"-"`
 }
 
-// parameter struct
-type parameter struct {
-	Page    string      `json:"page"`
-	Size    string      `json:"size"`
+// Request struct
+type Request struct {
+	Page    int64       `json:"page"`
+	Size    int64       `json:"size"`
 	Sort    string      `json:"sort"`
 	Order   string      `json:"order"`
-	Fields  string      `json:"fields"`
+	Fields  []string    `json:"fields"`
 	Filters interface{} `json:"filters"`
 }
 
@@ -877,14 +875,14 @@ type requestQuery struct {
 	Wheres      []string
 	Params      []interface{}
 	Sorts       []sortOrder
-	Limit       int
-	Offset      int
+	Limit       int64
+	Offset      int64
 }
 
 // pageRequest struct
 type pageRequest struct {
-	Size    int
-	Page    int
+	Size    int64
+	Page    int64
 	Sorts   []sortOrder
 	Filters pageFilters
 	Config  Config `json:"-"`
