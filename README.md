@@ -582,7 +582,7 @@ Define chain columns with same value separated by comma.
 // Example 1
 ["price,discount", ">", 10]
 // Produces:
-// WHERE price > 10 OR discount > 25
+// WHERE price > 10 OR discount > 10
 
 // Example 2
 ["deleted_at,expiration_date", null]
