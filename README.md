@@ -540,7 +540,7 @@ func main() {
 
 ## Filter format
 
-The format of filter param is a json encoded of multidimensional array.  
+Paginate Filters was inspired by [Frappe Framework API](https://docs.frappe.io/framework/user/en/api/rest#listing-documents). This feature is very powerful to support deep search and keep it safe. The format of filter param is a json encoded of multidimensional array.  
 Maximum array members is three, first index is `column_name`, second index is `operator` and third index is `values`, you can also pass array to values.  
 
 ```js
