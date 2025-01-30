@@ -195,7 +195,9 @@ func (r resContext) Response(res interface{}) Page {
 		result = result.Where(causes.WhereString, causes.Params...)
 	}
 
-	result = result.Count(&page.Total).
+	page.Total = r.CalculateCount(query, result)
+
+	result = result.
 		Limit(causes.Limit).
 		Offset(causes.Offset)
 
@@ -260,6 +262,44 @@ func (r resContext) Response(res interface{}) Page {
 	}
 
 	return page
+}
+
+func (r *resContext) CalculateCount(query *gorm.DB, result *gorm.DB) int64 {
+	var countResult int64
+	var cache gocache.AdapterInterface
+	cacheEnabled := false
+	if cachePointer := r.Pagination.Config.CacheAdapter; cachePointer != nil {
+		cache = *cachePointer
+		cacheEnabled = true
+	}
+
+	stmt := &gorm.Statement{DB: query.Statement.DB}
+	if err := stmt.Parse(query.Statement.Model); err != nil {
+		log.Println(err)
+	}
+	table := stmt.Table
+
+	cacheKey := ""
+	if table != "" {
+		cacheKey = fmt.Sprintf("table:%s:count", table)
+	}
+	if cacheEnabled && cacheKey != "" {
+		if count, err := cache.Get(cacheKey); count != "" && err == nil {
+			countResult, err = strconv.ParseInt(count, 10, 64)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
+	if countResult == 0 {
+		result.Count(&countResult)
+	}
+	if cacheEnabled {
+		if err := cache.Set(cacheKey, strconv.FormatInt(countResult, 10)); err != nil {
+			log.Println(err)
+		}
+	}
+	return countResult
 }
 
 // New Pagination instance
