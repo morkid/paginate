@@ -48,7 +48,7 @@ func (p *Pagination) With(stmt *gorm.DB) RequestContext {
 // ClearCache clear cache contains prefix
 func (p Pagination) ClearCache(keyPrefixes ...string) {
 	if len(keyPrefixes) > 0 && nil != p.Config && nil != p.Config.CacheAdapter {
-		adapter := *p.Config.CacheAdapter
+		adapter := p.Config.CacheAdapter
 		for i := range keyPrefixes {
 			if err := adapter.ClearPrefix(keyPrefixes[i]); nil != err {
 				log.Println(err)
@@ -60,7 +60,7 @@ func (p Pagination) ClearCache(keyPrefixes ...string) {
 // ClearAllCache clear all existing cache
 func (p Pagination) ClearAllCache() {
 	if nil != p.Config && nil != p.Config.CacheAdapter {
-		adapter := *p.Config.CacheAdapter
+		adapter := p.Config.CacheAdapter
 		if err := adapter.ClearAll(); nil != err {
 			log.Println(err)
 		}
@@ -144,7 +144,7 @@ func (r resContext) Response(res interface{}) Page {
 
 	if nil != p.Config.CacheAdapter {
 		cKey = createCacheKey(r.cachePrefix, pr)
-		adapter = *p.Config.CacheAdapter
+		adapter = p.Config.CacheAdapter
 		hasAdapter = true
 		if cKey != "" && adapter.IsValid(cKey) {
 			if cache, err := adapter.Get(cKey); nil == err {
@@ -825,7 +825,7 @@ type Config struct {
 	FilterParams         []string
 	FieldsParams         []string
 	FieldSelectorEnabled bool
-	CacheAdapter         *gocache.AdapterInterface              `json:"-"`
+	CacheAdapter         gocache.AdapterInterface               `json:"-"`
 	JSONMarshal          func(v interface{}) ([]byte, error)    `json:"-"`
 	JSONUnmarshal        func(data []byte, v interface{}) error `json:"-"`
 	ErrorEnabled         bool

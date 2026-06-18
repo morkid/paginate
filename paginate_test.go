@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/morkid/gocache"
 	"github.com/valyala/fasthttp"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -580,9 +579,9 @@ func TestCache(t *testing.T) {
 		},
 	}
 
-	var adapter gocache.AdapterInterface = &noOpAdapter{T: t}
+	adapter := &noOpAdapter{T: t}
 	config := &Config{
-		CacheAdapter:         &adapter,
+		CacheAdapter:         adapter,
 		FieldSelectorEnabled: true,
 	}
 	pg := New(config)

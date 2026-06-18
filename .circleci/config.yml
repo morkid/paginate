@@ -1,9 +1,0 @@
-version: 2
-jobs:
-  build:
-    docker:
-      - image: golang:1.16-buster
-    working_directory: /go/src/github.com/morkid/paginate
-    steps:
-      - checkout
-      - run: go test -v

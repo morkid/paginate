@@ -11,8 +11,8 @@ github.com/klauspost/compress v1.11.12 h1:famVnQVu7QwryBN4jNseQdUKES71ZAOnB6UQQJ
 github.com/klauspost/compress v1.11.12/go.mod h1:aoV0uJVorq1K+umq18yTdKaF57EivdYsUV+/s2qKfXs=
 github.com/mattn/go-sqlite3 v1.14.5 h1:1IdxlwTNazvbKJQSxoJ5/9ECbEeaTTyeU7sEAZ5KKTQ=
 github.com/mattn/go-sqlite3 v1.14.5/go.mod h1:WVKg1VTActs4Qso6iwGbiFih2UIHo0ENGwNd0Lj+XmI=
-github.com/morkid/gocache v1.0.0 h1:hTnU78Dqp2vs9al5vJC2TmmMF+Hm3nDH1AgRBjSXE+0=
-github.com/morkid/gocache v1.0.0/go.mod h1:xK+hmoEMjYffIBvjn7DE8WfSd/rF5Kz/G9f20OliMJY=
+github.com/morkid/gocache v1.0.3 h1:Tcgrq0PPGhrPr5WQ8jVvpHP7CrtOfyU9ZlddX45Ul0g=
+github.com/morkid/gocache v1.0.3/go.mod h1:9P5HSo4plzrVCwvoWuX8jwNh4eOXq4d4I7SyDHcJq1s=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.22.0 h1:OpwH5KDOJ9cS2bq8fD+KfT4IrksK0llvkHf4MZx42jQ=
