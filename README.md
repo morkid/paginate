@@ -204,6 +204,7 @@ example paging, sorting and filtering:
    -d '{"page":1,"size":20,"sort":"-name","filters":["name","john"]}' \
    http://localhost:3000/
    ```  
+   > **Note:** the parser consumes `r.Body` (downstream handlers should not read it again). POST bodies are capped at **1 MB**; oversized or malformed bodies are **rejected with a visible error** (`error: true`, message `request body too large` / `invalid request body`) — they never silently fall back to defaults. Empty bodies are treated as "no parameters". With fasthttp, the library's check runs *after* the server has buffered the body — also configure your fasthttp server's `ReadBufferSize`/max-body limits at the transport layer.
 10. You can bypass HTTP Request with [Custom Request](#programmatically-pagination).
 
 ## Example usage
@@ -543,6 +544,15 @@ func main() {
 Paginate Filters was inspired by [Frappe Framework API](https://docs.frappe.io/framework/user/en/api/rest#listing-documents). This feature is very powerful to support deep search and keep it safe. The format of filter param is a json encoded of multidimensional array.  
 Maximum array members is three, first index is `column_name`, second index is `operator` and third index is `values`, you can also pass array to values.  
 
+> **Safety rules (v1.2):**
+> - Operators must be one of the built-in allowlist (`= != <> < > <= >= LIKE NOT LIKE ILIKE NOT ILIKE IN NOT IN BETWEEN IS IS NOT`) or a configured `Config.ExtraOperators` entry; logical connectors are `AND`/`OR` **and must be array-wrapped** when used between groups: `[["name","like","jo"],["OR"],["age",">",20]]` — the bare-string form `[[groupA],"AND",[groupB]]` is rejected (fail-closed).
+> - Filter trees are limited to **16 levels of nesting** and **256 nodes**; a multi-column reference (`"name,email"`) may name at most **8 columns**, `IN`/`NOT IN` lists hold at most **1000 values**, `sort` takes at most **8 columns** and `fields` at most **128** distinct names. Larger payloads are rejected.
+> - Two connectors in a row (`["OR"],["OR"]`) are rejected. `NOT IN []` matches every row and `IN []` matches none; `NOT IN` lists containing `null` are rejected (they would match nothing).
+> - `LIKE` operands must be scalars (string/number/bool) and are escaped with `ESCAPE '!'` on every dialect. `ILIKE` is executed as `LIKE` on sqlite/mysql (the default `LOWER()` wrappers keep it case-insensitive). `IS`/`IS NOT` with a non-null value becomes `IS [NOT] DISTINCT FROM ?` on postgres and `<=>` on mysql.
+> - Columns whose destination struct field is tagged `json:"-"` cannot be filtered, sorted or selected (set `Config.AllowHiddenColumns` to opt out).
+> - Only `GET` (query string) and `POST` (JSON body) requests are parsed; `POST` ignores the query string, and other methods use the defaults.
+> - Malformed shapes (empty arrays `[[]]`, non-string operators, 4+ element tuples, stray `null` under `StrictFilters`) are rejected fail-closed rather than silently ignored.
+
 ```js
 // Format:
 ["column_name", "operator", "values"]
@@ -654,7 +664,13 @@ OrderParams         | `[]string` | `[]string{"order"}`    | if `CustomParamEnabl
 FilterParams       | `[]string` | `[]string{"filters"}` | if `CustomParamEnabled` is `true`,<br>you can set the `FilterParams` with custom parameter names.<br>For example:<br>`[]string{"search", "find", "other_alternative_param"}`.<br>The following requests will capture same result<br>`?search=["name","john"]`<br>or `?find=["name","john"]`<br>or `?other_alternative_param=["name","john"]`<br>or `?filters=["name","john"]`
 FieldsParams       | `[]string` | `[]string{"fields"}`  | if `FieldSelectorEnabled` and `CustomParamEnabled` is `true`,<br>you can set the `FieldsParams` with custom parameter names.<br>For example:<br>`[]string{"fields", "columns", "other_alternative_param"}`.<br>The following requests will capture same result `?fields=title,user.name`<br>or `?columns=title,user.name`<br>or `?other_alternative_param=title,user.name`
 CacheAdapter       | `*gocache.AdapterInterface` | `nil` | the cache adapter, see more about [cache config](#speed-up-response-with-cache).
-ErrorEnabled       | `bool` | `false` | Show error message in pagination result.
+CacheScope          | `func() string` | `nil` | Mixed into the cache key so different users/tenants with identical parameters never share cached pages.<br>**Required whenever the adapter may serve more than one user/tenant** — without it, pages are cached globally and a warning is logged once.
+ErrorEnabled        | `bool` | `false` | Show raw database error details in the pagination result.<br>Validation rejections (`invalid filter parameter`, etc.) are always reported in `error`/`error_message`, regardless of this flag.
+MaxSize             | `int64` | `100` | Upper bound for **client-provided** `size` values. Server-side `DefaultSize` is not capped by this value.
+ExtraOperators      | `[]string` | `nil` | Extends the operator allowlist (e.g. `"SIMILAR TO"`). Entries are sanitized: upper-cased, anything containing characters outside `[A-Z0-9 ]` is dropped. Operators from requests are always validated against the allowlist.
+ColumnValidator     | `func(string) bool` | `nil` | Replaces the default identifier validation (`[A-Za-z_][A-Za-z0-9_]*` per dot/comma segment) for filter columns, sorts and fields.
+StrictFilters       | `bool` | `false` | Reject filter trees that contain elements producing no WHERE fragment (garbage/dropped elements) instead of ignoring them.
+AllowHiddenColumns  | `bool` | `false` | Allow filters, sorts and field selection on destination fields tagged `json:"-"`. Off by default because filtering on a hidden column leaks its value through `total`.
 
 ## Override results
 
@@ -740,6 +756,8 @@ pg := paginate.New(config)
 
 ## Speed up response with cache
 You can speed up results without looking database directly with cache adapter. See more about [cache adapter](https://github.com/morkid/gocache).
+
+> **Multi-tenant warning:** if the adapter can serve more than one user/tenant, you **must** set `Config.CacheScope` (e.g. return the tenant ID) — otherwise identical query parameters share one cache entry across users. Cache keys are `prefix:sha256…`; use `pg.ClearCache("tenant:")` for exact-scope invalidation.
 
 ### In memory cache
 in memory cache is not recommended for production environment:

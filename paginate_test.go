@@ -70,7 +70,7 @@ func TestGetNetHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", "LIKE", filters[0].Operator)
 		}
 		value, isValid := filters[0].Value.(string)
-		expected := "%" + avg + "%"
+		expected := "%" + strings.ReplaceAll(avg, "%", `!%`) + "%"
 		if !isValid || value != expected {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
@@ -125,7 +125,7 @@ func TestGetFastHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", "LIKE", filters[0].Operator)
 		}
 		value, isValid := filters[0].Value.(string)
-		expected := "%" + avg + "%"
+		expected := "%" + strings.ReplaceAll(avg, "%", `!%`) + "%"
 		if !isValid || value != expected {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
@@ -193,7 +193,7 @@ func TestPostNetHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", "LIKE", filters[0].Operator)
 		}
 		value, isValid := filters[0].Value.(string)
-		expected := "%" + avg + "%"
+		expected := "%" + strings.ReplaceAll(avg, "%", `!%`) + "%"
 		if !isValid || value != expected {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
@@ -257,7 +257,7 @@ func TestPostFastHttp(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", "LIKE", filters[0].Operator)
 		}
 		value, isValid := filters[0].Value.(string)
-		expected := "%" + avg + "%"
+		expected := "%" + strings.ReplaceAll(avg, "%", `!%`) + "%"
 		if !isValid || value != expected {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
@@ -318,7 +318,7 @@ func TestProgrammaticallyPaginate(t *testing.T) {
 			t.Errorf(format, "Filter operator for user.average_point", "LIKE", filters[0].Operator)
 		}
 		value, isValid := filters[0].Value.(string)
-		expected := "%" + avg + "%"
+		expected := "%" + strings.ReplaceAll(avg, "%", `!%`) + "%"
 		if !isValid || value != expected {
 			t.Errorf(format, "Filter operator for user.average_point", expected, value)
 		}
@@ -501,7 +501,7 @@ func (n *noOpAdapter) Get(key string) (string, error) {
 	return "", errors.New("Cache not found")
 }
 func (n *noOpAdapter) Set(key string, value string) error {
-	if _, ok := n.keyValues[key]; !ok {
+	if n.keyValues == nil {
 		n.keyValues = map[string]string{}
 	}
 	n.keyValues[key] = value
@@ -511,10 +511,10 @@ func (n *noOpAdapter) Set(key string, value string) error {
 func (n *noOpAdapter) IsValid(key string) bool {
 	if _, ok := n.keyValues[key]; ok {
 		n.T.Log("Cache exists and not expired")
-		return false
+		return true
 	}
 	n.T.Log("Cache doesn't exists or expired")
-	return true
+	return false
 }
 func (n *noOpAdapter) Clear(key string) error {
 	return nil
@@ -691,6 +691,6 @@ func TestGenerateWhereCauses(t *testing.T) {
 	where := strings.Join(wheres, " ")
 	where = strings.ReplaceAll(where, "( ", "(")
 	where = strings.ReplaceAll(where, " )", ")")
-	expect(t, "((((name LIKE ? OR email LIKE ? OR address LIKE ?))) OR (id > ?))", where)
+	expect(t, "((((name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' OR address LIKE ? ESCAPE '!'))) OR (id > ?))", where)
 	expect(t, 4, len(params))
 }
